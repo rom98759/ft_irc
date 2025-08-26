@@ -25,9 +25,10 @@ class	Server
 	private:
 		const unsigned short	_port;
 		const std::string		_pw;
-	public:
+	public: /* -CDstructors- */
 		Server(void) : _port(), _pw() {};
 		~Server(void);
-		const unsigned short	&getPort(void) const;
-		const std::string		&getPw(void) const;
+	public: /* -Getters- */
+		const unsigned short	&getPort(void) const { return (_port); };
+		const std::string		&getPw(void) const { return (_pw); };
 };

@@ -21,13 +21,3 @@ Server::~Server(void)
 {
 	
 }
-
-const unsigned short	&Server::getPort(void) const
-{
-	return (_port);
-}
-
-const std::string	&Server::getPw(void) const
-{
-	return (_pw);
-}
