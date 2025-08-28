@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include "ft_irc.h"
+#include <sys/socket.h>
 
 static unsigned short	ft_atous(const char *const a)
 {
@@ -28,15 +29,37 @@ static unsigned short	ft_atous(const char *const a)
 	return (us * (us > 0 && us <= 65635 && !*(a + i)));
 }
 
+static inline void	ft_tmp_add_client(Server *const srv, const int &fd)
+{
+	try
+	{
+		Client *const	tmp = new Client(fd);
+		*srv += tmp;
+		std::cout << "New Client." << std::endl;
+	}
+	catch (const std::exception &e)
+	{
+		std::cout << "Error. " << e.what() << std::endl;
+	}
+}
+
 static inline char	ft_start_srv(Server *const srv)
 {
-	std::cout << srv->getPort() << std::endl << srv->getPw() << std::endl;
-	return (!!srv);
+	if (!srv->initVector())
+	{
+		SRV_SHUTDOWN(srv);
+		return (1);
+	}
+	for (char i = -5; i < 10; ++i) // TMP
+		ft_tmp_add_client(srv, i); // TMP
+	std::cout << srv->getPort() << std::endl << srv->getPw() << std::endl << srv->getFd() << std::endl; // TMP
+	SRV_SHUTDOWN(srv);
+	return (0);
 }
 
 int	main(int argc, char *argv[])
 {
-	t_srv_set		srv_set = {0, *(argv + 2)};
+	t_srv_set				srv_set = {0, *(argv + 2), 0, NULL};
 
 	if (argc != 3)
 	{
@@ -53,6 +76,12 @@ int	main(int argc, char *argv[])
 	{
 		std::cerr << "Error. Unset <password>." << std::endl;
 		return (2);
+	}
+	srv_set._fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (srv_set._fd < 0)
+	{
+		std::cerr << "Error. Socket Failed." << std::endl;
+		return (1);
 	}
 	return (ft_start_srv((Server *)&srv_set));
 }

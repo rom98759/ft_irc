@@ -1,22 +1,38 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_irc.h                                           :+:      :+:    :+:   */
+/*   Client.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: kzhen-cl <marvin@d42.fr>                   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/08/28 15:46:14 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/08/28 15:46:14 by kzhen-cl         ###   ########.fr       */
+/*   Created: 2025/08/28 10:43:41 by kzhen-cl          #+#    #+#             */
+/*   Updated: 2025/08/28 10:43:41 by kzhen-cl         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
-
-#include "Server.hpp"
+#include <unistd.h>
 #include "Client.hpp"
 
-#ifdef SRV_SHUTDOWN
-# undef SRV_SHUTDOWN
-#endif
+const ErrorFdException	Client::EFE;
 
-#define SRV_SHUTDOWN(srv) (srv)->~Server()
+Client::Client(const int &fd) : _fd(fd)
+{
+	if (_fd < 0)
+		throw (Client::EFE);
+}
+
+Client::Client(const Client &cpy) : _fd(cpy._fd)
+{
+	_nick = cpy._nick;
+}
+
+Client	&Client::operator=(const Client &cpy)
+{
+	_nick = cpy._nick;
+	return (*this);
+}
+
+Client::~Client(void)
+{
+	//close(_fd); For the moment tests are done without real fds so closing them is an issue
+}

@@ -2,7 +2,7 @@ NAME = ircserv
 
 OBJDIR = obj/
 
-SRC = main.cpp Server.cpp
+SRC = main.cpp Server.cpp Client.cpp
 OBJ = $(patsubst %.cpp,$(OBJDIR)%.o,$(notdir $(SRC)))
 DEP = $(patsubst %.cpp,$(OBJDIR)%.d,$(notdir $(SRC)))
 
