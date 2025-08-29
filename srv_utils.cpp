@@ -1,30 +1,25 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_gs_srv.cpp                                      :+:      :+:    :+:   */
+/*   srv_utils.cpp                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: kzhen-cl <marvin@d42.fr>                   +#+  +:+       +#+        */
+/*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/08/29 11:42:15 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/08/29 11:42:15 by kzhen-cl         ###   ########.fr       */
+/*   Created: 2025/08/29 14:30:00 by rcaillie          #+#    #+#             */
+/*   Updated: 2025/08/29 14:30:00 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_irc.h"
 
-static inline Server	*gs(Server *const srv)
-{
-	static Server *const	save = srv;
-
-	return (save);
-}
+static Server *g_srv = NULL;
 
 void	ft_set_srv(Server *const srv)
 {
-	gs(srv);
+	g_srv = srv;
 }
 
 Server	*ft_get_srv(void)
 {
-	return (gs(NULL));
+	return (g_srv);
 }
