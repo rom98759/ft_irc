@@ -10,9 +10,10 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
 #include "ft_irc.h"
 #include <sys/socket.h>
+#include <signal.h>
+#include <stdlib.h>
 
 static unsigned short	ft_atous(const char *const a)
 {
@@ -43,8 +44,19 @@ static inline void	ft_tmp_add_client(Server *const srv, const int &fd)
 	}
 }
 
-static inline char	ft_start_srv(Server *const srv)
+static inline void	ft_srv_shutdown(int sig)
 {
+	(void) sig;
+	SRV_SHUTDOWN(ft_get_srv());
+	exit(0);
+}
+
+static inline char	ft_start_srv(void)
+{
+	Server *const	srv = ft_get_srv();
+
+	signal(SIGINT, ft_srv_shutdown);
+	signal(SIGQUIT, ft_srv_shutdown);
 	if (!srv->initVector())
 	{
 		SRV_SHUTDOWN(srv);
@@ -53,12 +65,16 @@ static inline char	ft_start_srv(Server *const srv)
 	for (char i = -5; i < 10; ++i) // TMP
 		ft_tmp_add_client(srv, i); // TMP
 	std::cout << srv->getPort() << std::endl << srv->getPw() << std::endl << srv->getFd() << std::endl; // TMP
+	while (1)
+		;
 	SRV_SHUTDOWN(srv);
 	return (0);
 }
 
 int	main(int argc, char *argv[])
 {
+	signal(SIGINT, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
 	t_srv_set				srv_set = {0, *(argv + 2), 0, NULL};
 
 	if (argc != 3)
@@ -83,5 +99,6 @@ int	main(int argc, char *argv[])
 		std::cerr << "Error. Socket Failed." << std::endl;
 		return (1);
 	}
-	return (ft_start_srv((Server *)&srv_set));
+	ft_set_srv((Server *)&srv_set);
+	return (ft_start_srv());
 }

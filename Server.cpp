@@ -27,6 +27,7 @@ Server::~Server(void)
 		delete (_clients);
 	}
 	close(_fd);
+	std::cout << "\nServer Shutdown !" << std::endl;
 }
 
 Server	&Server::operator+=(Client *const cl)
