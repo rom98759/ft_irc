@@ -199,7 +199,7 @@ void Server::setupPollFds(void)
 		_pollfds.push_back(client_pollfd);
 	}
 
-	std::cout << "Surveillance de " << _pollfds.size() << " descripteurs..." << std::endl;
+	// std::cout << "Surveillance de " << _pollfds.size() << " descripteurs..." << std::endl;
 }
 
 // Vérifier les erreurs de poll et décider de continuer ou non
