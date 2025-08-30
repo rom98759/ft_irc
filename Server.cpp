@@ -15,11 +15,10 @@
 
 // Initialisation des variables statiques
 Server* Server::_instance = NULL;
-volatile bool Server::_running = true;
+bool Server::_running = true;
 
 Server::Server(const unsigned short &port, const std::string &pw)
-	: _port(port), _pw(pw), _fd(-1), _clients(NULL)
-{}
+	: _port(port), _pw(pw), _fd(-1) {}
 
 /*
 Behaviour:
@@ -28,47 +27,29 @@ Behaviour:
 */
 Server::~Server(void)
 {
-	if (_clients)
-	{
-		for (int i = 0; i < (int)_clients->size(); ++i)
-			delete ((*_clients)[i]);
-		delete (_clients);
-	}
+	for (int i = 0; i < (int)_clients.size(); ++i)
+		delete (_clients[i]);
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
 
 Server	&Server::operator+=(Client *const cl)
 {
-	_clients->push_back(cl);
+	_clients.push_back(cl);
 	return (*this);
 }
 
 Server	&Server::operator-=(Client *const cl)
 {
-	for (int i = 0; i < (int)_clients->size(); ++i)
+	for (int i = 0; i < (int)_clients.size(); ++i)
 	{
-		if ((*_clients)[i] == cl)
+		if (_clients[i] == cl)
 		{
 			delete (cl);
-			_clients->erase(_clients->begin() + i);
+			_clients.erase(_clients.begin() + i);
 		}
 	}
 	return (*this);
-}
-
-unsigned char	Server::initVector(void)
-{
-	try
-	{
-		_clients = new (std::vector<Client *>);
-	}
-	catch (const std::exception &e)
-	{
-		std::cout << "Error. " << e.what() << std::endl;
-		return (0);
-	}
-	return (1);
 }
 
 bool Server::initServer(void)
@@ -113,10 +94,6 @@ bool Server::initServer(void)
 
 void Server::run(void)
 {
-	if (!initVector())
-		return;
-
-	_running = true;
 	while (_running)
 	{
 		// Configuration pour poll()
@@ -165,7 +142,5 @@ void Server::signalHandler(int signum)
 {
 	std::cout << "\nInterrupt signal (" << signum << ") received.\n";
 	if (_instance)
-	{
 		_running = false; // Permettre une sortie propre de la boucle run()
-	}
 }

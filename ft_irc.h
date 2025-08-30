@@ -14,12 +14,3 @@
 
 #include "Server.hpp"
 #include "Client.hpp"
-
-#ifdef SRV_SHUTDOWN
-# undef SRV_SHUTDOWN
-#endif
-
-#define SRV_SHUTDOWN(srv) (srv)->~Server()
-
-void	ft_set_srv(Server *const srv);
-Server	*ft_get_srv(void);

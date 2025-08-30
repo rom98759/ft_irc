@@ -26,33 +26,26 @@
 
 class	Client;
 
-typedef struct s_srv_set
-{
-	unsigned short			_port;
-	std::string				_pw;
-	int						_fd;
-	std::vector<Client *>	*_clients;
-}	t_srv_set;
-
 class	Server
 {
 	private:
 		const unsigned short		_port;
 		const std::string			_pw;
 		int							_fd;
-		std::vector<Client *>		*_clients;
+		std::vector<Client *>		_clients;
 		static Server*              _instance;
-		static volatile bool        _running;
+		static bool			        _running;
 
 	public: /* -CDstructors- */
-		Server(void) : _port(), _pw(), _fd() {};
 		Server(const unsigned short &port, const std::string &pw);
 		~Server(void);
 	public: /* -Getters- */
 		const unsigned short		&getPort(void) const { return (_port); };
 		const std::string			&getPw(void) const { return (_pw); };
 		const int					&getFd(void) const { return (_fd); };
-		const std::vector<Client *>	&getClients(void) const { return (*_clients); };
+		const std::vector<Client *>	&getClients(void) const { return (_clients); };
+		static const Server			*getInstance(void) { return (_instance); };
+		static const bool			&isRunning(void) { return (_running); };
 	public: /* -Methods- */
 		Server						&operator+=(Client *const cl);
 		Server						&operator-=(Client *const cl);
@@ -61,8 +54,6 @@ class	Server
 		void						run(void);
 		static void					signalHandler(int sig);
 
-		// Méthodes pour la gestion de l'instance
+		// Setter de l'instance
 		static void                 setInstance(Server* srv) { _instance = srv; }
-		static Server*              getInstance() { return _instance; }
-		static bool                 isRunning() { return _running; }
 };

@@ -35,28 +35,28 @@ int	main(int argc, char *argv[])
 	if (argc != 3)
 	{
 		std::cerr << "Usage: ./ircserv <port> <password>" << std::endl;
-		return 1;
+		return (2);
 	}
 
 	unsigned short port = ft_atous(argv[1]);
 	if (!port)
 	{
 		std::cerr << "Error. Incorrect <port> format." << std::endl;
-		return 1;
+		return (2);
 	}
 
 	std::string pw = argv[2];
 	if (pw.empty())
 	{
 		std::cerr << "Error. Unset <password>." << std::endl;
-		return 1;
+		return (2);
 	}
 
 	Server srv(port, pw);
 	Server::setInstance(&srv);
 
 	if (!srv.initServer())
-		return 1;
+		return (1);
 
 	srv.run();
 
