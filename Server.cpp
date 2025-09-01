@@ -110,10 +110,6 @@ void Server::run(void)
 			continue;
 		}
 
-		// Si le signal a été reçu, sortir proprement
-		if (!_running)
-			break;
-
 		// S'il y a une activité sur le socket du serveur
 		if (activity > 0 && (fds[0].revents & POLLIN))
 		{

@@ -34,5 +34,5 @@ Client	&Client::operator=(const Client &cpy)
 
 Client::~Client(void)
 {
-	//close(_fd); For the moment tests are done without real fds so closing them is an issue
+	close(_fd);
 }
