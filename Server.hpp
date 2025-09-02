@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <poll.h>
+#include <fcntl.h>
+#include <string.h>
 
 class	Client;
 
@@ -34,7 +36,23 @@ class	Server
 		int							_fd;
 		std::vector<Client *>		_clients;
 		static Server*              _instance;
-		static bool			        _running;
+		static bool					_running;
+
+		// Structure pour poll()
+		std::vector<pollfd>         _pollfds;
+
+		// Méthodes privées pour l'organisation interne
+		void                        setupPollFds(void);
+		void                        handlePollEvents(int activity);
+		bool                        checkSocketErrors(int activity);
+
+		// Structure pour poll()
+		std::vector<pollfd>         _pollfds;
+
+		// Méthodes privées pour l'organisation interne
+		void                        setupPollFds(void);
+		void                        handlePollEvents(int activity);
+		bool                        checkSocketErrors(int activity);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
@@ -49,9 +67,22 @@ class	Server
 	public: /* -Methods- */
 		Server						&operator+=(Client *const cl);
 		Server						&operator-=(Client *const cl);
+
+		// Méthodes d'initialisation
 		unsigned char				initVector(void);
 		bool						initServer(void);
+		bool                        initSocketOptions(void);
+		bool                        bindAndListen(void);
+
+		// Méthode principale
 		void						run(void);
+
+		// Gestion des clients
+		void                        handleNewConnection(void);
+		bool                        handleClientMessage(Client *client);
+		void                        disconnectClient(Client *client);
+
+		// Gestion des signaux
 		static void					signalHandler(int sig);
 
 		// Setter de l'instance
