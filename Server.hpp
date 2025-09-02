@@ -45,14 +45,8 @@ class	Server
 		void                        setupPollFds(void);
 		void                        handlePollEvents(int activity);
 		bool                        checkSocketErrors(int activity);
-
-		// Structure pour poll()
-		std::vector<pollfd>         _pollfds;
-
-		// Méthodes privées pour l'organisation interne
-		void                        setupPollFds(void);
-		void                        handlePollEvents(int activity);
-		bool                        checkSocketErrors(int activity);
+		void                        handleClientInput(size_t pollfdIndex);
+		void                        handleClientError(size_t pollfdIndex);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
@@ -69,7 +63,6 @@ class	Server
 		Server						&operator-=(Client *const cl);
 
 		// Méthodes d'initialisation
-		unsigned char				initVector(void);
 		bool						initServer(void);
 		bool                        initSocketOptions(void);
 		bool                        bindAndListen(void);
@@ -79,6 +72,8 @@ class	Server
 
 		// Gestion des clients
 		void                        handleNewConnection(void);
+		bool                        configureClientSocket(int client_fd);
+		Client*                     createClient(int client_fd, struct sockaddr_in &client_addr);
 		bool                        handleClientMessage(Client *client);
 		void                        disconnectClient(Client *client);
 

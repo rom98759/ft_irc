@@ -51,27 +51,30 @@ bool Client::readFromSocket(void)
 	memset(buffer, 0, sizeof(buffer));
 	bytesRead = recv(_fd, buffer, sizeof(buffer) - 1, 0);
 
+	// Lu
 	if (bytesRead > 0)
 	{
-		buffer[bytesRead] = '\0'; // Assurer que la chaîne est bien terminée
+		buffer[bytesRead] = '\0';
 		appendToBuffer(buffer);
 		std::cout << "Reçu du client fd=" << _fd << ": " << buffer << std::endl;
 		return true;
 	}
+	// Client disconnected
 	else if (bytesRead == 0)
 	{
 		std::cout << "Client fd=" << _fd << " déconnecté." << std::endl;
-		return false; // Connexion fermée par le client
+		return false;
 	}
 	else
 	{
+		// Erreur lecture
 		if (errno != EAGAIN && errno != EWOULDBLOCK)
 		{
 			std::cerr << "Erreur lors de la lecture du client fd=" << _fd << ": ";
 			std::cerr << strerror(errno) << std::endl;
 			return false;
 		}
-		return true; // Pas de données disponibles pour le moment
+		return true;
 	}
 }
 
@@ -84,6 +87,7 @@ bool Client::sendMessage(const std::string &message)
 {
 	ssize_t bytesSent = send(_fd, message.c_str(), message.length(), 0);
 
+	// Erreur d'envoi
 	if (bytesSent < 0)
 	{
 		std::cerr << "Erreur lors de l'envoi au client fd=" << _fd << ": ";
@@ -93,7 +97,9 @@ bool Client::sendMessage(const std::string &message)
 	else if (static_cast<size_t>(bytesSent) < message.length())
 	{
 		std::cerr << "Envoi partiel au client fd=" << _fd << std::endl;
-		// Idéalement, on gérerait ici l'envoi partiel en mettant en file d'attente le reste
+		// Envoi en attente
+		// TODO: Implement partial send handling
+		// Mettre le reste du message dans une file d'attente
 		return false;
 	}
 

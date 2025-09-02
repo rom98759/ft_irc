@@ -30,8 +30,8 @@ class	Client
 	private:
 		const int						_fd;
 		std::string						_nick;
-		std::string						_buffer;     // Buffer pour stocker les données reçues
-		bool							_registered; // État d'enregistrement du client
+		std::string						_buffer;     // Buffer stocker données reçues
+		bool							_registered; // Etat d'enregistrement du client
 
 	public: /* -CDstructors- */
 		Client(const int &fd);

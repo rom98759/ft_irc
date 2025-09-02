@@ -6,11 +6,10 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/26 12:02:16 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/08/29 13:51:23 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/02 17:06:08 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_irc.h"
 #include <sys/socket.h>
 #include <signal.h>
 #include <stdlib.h>
