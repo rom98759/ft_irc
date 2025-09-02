@@ -45,7 +45,7 @@ class	Client
 		const int						&getFd(void) const { return (_fd); };
 		const std::string				&getNick(void) const { return (_nick); };
 		const std::string				&getBuffer(void) const { return (_buffer); };
-		bool							isRegistered(void) const { return (_registered); };
+		const bool						&isRegistered(void) const { return (_registered); };
 	public: /* -Methods- */
 		bool							readFromSocket(void); // Lire des données depuis le socket
 		void							appendToBuffer(const std::string &data); // Ajouter des données au buffer

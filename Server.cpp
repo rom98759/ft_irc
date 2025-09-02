@@ -15,8 +15,8 @@
 #include <string.h> // Pour strerror
 
 // Initialisation des variables statiques
-Server* Server::_instance = NULL;
-bool Server::_running = true;
+Server	*Server::_instance = NULL;
+bool	Server::_running = true;
 
 Server::Server(const unsigned short &port, const std::string &pw)
 	: _port(port), _pw(pw), _fd(-1) {}
@@ -54,7 +54,68 @@ Server	&Server::operator-=(Client *const cl)
 	return (*this);
 }
 
-bool Server::initServer(void)
+static std::size_t	ft_skip_spaces(const std::string &s, const std::size_t &start)
+{
+	return (s.find_first_not_of(" \t\n\v\f\r", start));
+}
+
+/* ****************************| EVENTS/COMMANDS |**************************** */
+/* ********* char	(Server::*)(Client *const, const std::string &); ********* */
+/* *************************************************************************** */
+
+char	Server::pass(Client *const cl, const std::string &cmd)
+{
+	if (cl->isRegistered())
+	{
+		cl->sendMessage("Error. Already registered.\r\n");
+		return (1);
+	}
+	std::size_t	idx = ft_skip_spaces(cmd, 4);
+	if (idx >= cmd.size())
+	{
+		cl->sendMessage("Error. No PASS given.\r\n");
+		return (1);
+	}
+	std::string	pass = cmd.substr(idx);
+	if (pass == _pw)
+	{
+		cl->sendMessage("Match ! You are now registered.\r\n");
+		cl->setRegistered(1);
+	}
+	else
+		cl->sendMessage("Wrong PASS. Please retry.\r\n");
+	return (1);
+}
+
+char	Server::nick(Client *const cl, const std::string &cmd)
+{
+	(void) cmd;
+	cl->sendMessage("This feature isn't available.\r\n");
+	return (1);
+}
+
+char	Server::user(Client *const cl, const std::string &cmd)
+{
+	(void) cmd;
+	cl->sendMessage("This feature isn't available.\r\n");
+	return (1);
+}
+
+/* ****************************| EVENTS/COMMANDS |**************************** */
+
+inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::string &))
+{
+	_events.push_back(std::make_pair(cmd, f));
+}
+
+void	Server::initEvents(void)
+{
+	addEvent("PASS", &Server::pass);
+	addEvent("NICK", &Server::nick);
+	addEvent("USER", &Server::user);
+}
+
+bool	Server::initServer(void)
 {
 	// signaux
 	signal(SIGINT, Server::signalHandler);
@@ -76,12 +137,14 @@ bool Server::initServer(void)
 	if (!bindAndListen())
 		return false;
 
+	initEvents();
+
 	std::cout << "Server listening on port " << _port << std::endl;
 	return true;
 }
 
 // Initialiser les options du socket
-bool Server::initSocketOptions(void)
+bool	Server::initSocketOptions(void)
 {
 	// Reutiliser port apres fermeture
 	int opt = 1;
@@ -105,7 +168,7 @@ bool Server::initSocketOptions(void)
 }
 
 // Lier le socket à un port et commencer à écouter
-bool Server::bindAndListen(void)
+bool	Server::bindAndListen(void)
 {
 	sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
@@ -132,9 +195,8 @@ bool Server::bindAndListen(void)
 	return true;
 }
 
-void Server::run(void)
+void	Server::run(void)
 {
-	_running = true;
 	while (_running)
 	{
 		// Configurer pollfd serveur / clients
@@ -158,7 +220,7 @@ void Server::run(void)
 }
 
 // Configurer les structures pollfd pour le serveur et les clients
-void Server::setupPollFds(void)
+void	Server::setupPollFds(void)
 {
 	_pollfds.clear();
 
@@ -181,7 +243,7 @@ void Server::setupPollFds(void)
 }
 
 // Vérifier les erreurs de poll et décider de continuer ou non
-bool Server::checkSocketErrors(int activity)
+bool	Server::checkSocketErrors(int activity)
 {
 	// Erreur poll
 	if (activity < 0)
@@ -206,7 +268,7 @@ bool Server::checkSocketErrors(int activity)
 }
 
 // Traiter les événements détectés par poll
-void Server::handlePollEvents(int activity)
+void	Server::handlePollEvents(int activity)
 {
 	// Nouvelle connexion (ET binaire si true) sur server
 	if (_pollfds[0].revents & POLLIN)
@@ -235,7 +297,7 @@ void Server::handlePollEvents(int activity)
 }
 
 // Gère les données envoyées par un client
-void Server::handleClientInput(size_t pollfdIndex)
+void	Server::handleClientInput(size_t pollfdIndex)
 {
 	// Trouver le client correspondant au descripteur
 	for (size_t j = 0; j < _clients.size(); ++j)
@@ -253,7 +315,7 @@ void Server::handleClientInput(size_t pollfdIndex)
 }
 
 // Gère les erreurs de connexion avec un client
-void Server::handleClientError(size_t pollfdIndex)
+void	Server::handleClientError(size_t pollfdIndex)
 {
 	// Gérer la déconnexion ou l'erreur
 	for (size_t j = 0; j < _clients.size(); ++j)
@@ -268,7 +330,7 @@ void Server::handleClientError(size_t pollfdIndex)
 }
 
 // Static signal handler for SIGINT and SIGQUIT
-void Server::signalHandler(int signum)
+void	Server::signalHandler(int signum)
 {
 	std::cout << "\nInterrupt signal (" << signum << ") received.\n";
 	if (_instance)
@@ -277,7 +339,7 @@ void Server::signalHandler(int signum)
 }
 
 // Gère une nouvelle connexion au serveur
-void Server::handleNewConnection(void)
+void	Server::handleNewConnection(void)
 {
 	struct sockaddr_in client_addr;
 	socklen_t addr_len = sizeof(client_addr);
@@ -301,7 +363,7 @@ void Server::handleNewConnection(void)
 }
 
 // Configure un socket client en mode non-bloquant
-bool Server::configureClientSocket(int client_fd)
+bool	Server::configureClientSocket(int client_fd)
 {
 	// Mode non bloquant client
 	int flags = fcntl(client_fd, F_GETFL, 0);
@@ -315,7 +377,7 @@ bool Server::configureClientSocket(int client_fd)
 }
 
 // Crée un nouveau client et l'ajoute à la liste
-Client* Server::createClient(int client_fd, struct sockaddr_in &client_addr)
+Client	*Server::createClient(int client_fd, struct sockaddr_in &client_addr)
 {
 	try {
 		Client *tmp = new Client(client_fd);
@@ -339,9 +401,17 @@ Client* Server::createClient(int client_fd, struct sockaddr_in &client_addr)
 	}
 }
 
+static inline char	ft_match(const std::string &srvCmd, const std::string &clInput)
+{
+	std::size_t	sc = srvCmd.size();
+
+	return (clInput.size() > sc && srvCmd == clInput.substr(0, sc)
+		&& std::isspace(clInput.at(sc)));
+}
+
 // Gère les messages reçus d'un client
 // Retourne false si le client s'est déconnecté
-bool Server::handleClientMessage(Client *client)
+bool	Server::handleClientMessage(Client *client)
 {
 	if (!client->readFromSocket())
 	{
@@ -367,16 +437,19 @@ bool Server::handleClientMessage(Client *client)
 
 		// Analyser et traiter le message IRC ici
 		// TODO: Implémenter le parsing complet des commandes IRC
+		for (int i = 0; i < (int)_events.size(); ++i)
+			if (ft_match(_events[i].first, message))
+				return ((this->*_events[i].second)(client, message));
 
 		// Exemple : Echo du message reçu
-		client->sendMessage("ECHO: " + message + "\r\n");
+		// client->sendMessage("ECHO: " + message + "\r\n");
 	}
 
 	return true;
 }
 
 // Déconnecte proprement un client
-void Server::disconnectClient(Client *client)
+void	Server::disconnectClient(Client *client)
 {
 	std::cout << "Déconnexion du client fd=" << client->getFd() << std::endl;
 

@@ -37,6 +37,12 @@ class	Server
 		std::vector<Client *>		_clients;
 		static Server*              _instance;
 		static bool					_running;
+		std::vector<
+			std::pair<
+				const std::string,
+				char (Server::*)(Client *const, const std::string &)
+			>
+		>							_events;
 
 		// Structure pour poll()
 		std::vector<pollfd>         _pollfds;
@@ -47,6 +53,12 @@ class	Server
 		bool                        checkSocketErrors(int activity);
 		void                        handleClientInput(size_t pollfdIndex);
 		void                        handleClientError(size_t pollfdIndex);
+		void						addEvent(const std::string &, char (Server::*)(Client *const, const std::string &));
+		void						initEvents(void);
+	private: /* -Events/Commands- */
+		char						pass(Client *const, const std::string &);
+		char						nick(Client *const, const std::string &);
+		char						user(Client *const, const std::string &);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
