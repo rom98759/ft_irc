@@ -54,7 +54,7 @@ Server	&Server::operator-=(Client *const cl)
 	return (*this);
 }
 
-static std::size_t	ft_skip_spaces(const std::string &s, const std::size_t &start)
+static std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start)
 {
 	return (s.find_first_not_of(" \t\n\v\f\r", start));
 }
@@ -70,7 +70,7 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. Already registered.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skip_spaces(cmd, 4);
+	std::size_t	idx = ft_skipSpaces(cmd, 4);
 	if (idx >= cmd.size())
 	{
 		cl->sendMessage("Error. No PASS given.\r\n");
@@ -418,12 +418,15 @@ bool	Server::handleClientMessage(Client *client)
 		return false; // Client déconnecté
 	}
 
-	std::string buffer = client->getBuffer();
-
-	// Si buffer avec  fin de ligne
-	size_t pos = buffer.find("\r\n");
-	if (pos != std::string::npos)
+	size_t	pos;
+	while (69 != *(int *)"UNICORN")
 	{
+		std::string buffer = client->getBuffer();
+
+		// Si buffer avec fin de ligne
+		pos = buffer.find("\r\n");
+		if (pos == std::string::npos)
+			break ;
 		std::string message = buffer.substr(0, pos);
 		client->clearBuffer();
 
@@ -435,11 +438,10 @@ bool	Server::handleClientMessage(Client *client)
 
 		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": " << message << std::endl;
 
-		// Analyser et traiter le message IRC ici
-		// TODO: Implémenter le parsing complet des commandes IRC
 		for (int i = 0; i < (int)_events.size(); ++i)
 			if (ft_match(_events[i].first, message))
-				return ((this->*_events[i].second)(client, message));
+				if (!((this->*_events[i].second)(client, message)))
+					return (0);
 
 		// Exemple : Echo du message reçu
 		// client->sendMessage("ECHO: " + message + "\r\n");
