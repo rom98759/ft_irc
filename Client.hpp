@@ -31,7 +31,7 @@ class	Client
 		const int						_fd;
 		std::string						_nick;
 		std::string						_buffer;     // Buffer stocker données reçues
-		bool							_registered; // Etat d'enregistrement du client
+		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
 
 	public: /* -CDstructors- */
 		Client(const int &fd);
@@ -40,12 +40,13 @@ class	Client
 		~Client(void);
 	public: /* -Setters- */
 		void							setNick(const std::string &nick) { _nick = nick; };
-		void							setRegistered(bool status) { _registered = status; };
+		void							upRegisterLevel(void) { ++_registerLevel; };
 	public: /* -Getters- */
 		const int						&getFd(void) const { return (_fd); };
 		const std::string				&getNick(void) const { return (_nick); };
 		const std::string				&getBuffer(void) const { return (_buffer); };
-		const bool						&isRegistered(void) const { return (_registered); };
+		bool							isRegistered(void) const { return (!(_registerLevel ^ 0b11)); };
+		unsigned char				getRegisterLevel(void) const { return (_registerLevel); };
 	public: /* -Methods- */
 		bool							readFromSocket(void); // Lire des données depuis le socket
 		void							appendToBuffer(const std::string &data); // Ajouter des données au buffer

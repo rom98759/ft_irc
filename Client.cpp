@@ -18,13 +18,13 @@
 
 const ErrorFdException	Client::EFE;
 
-Client::Client(const int &fd) : _fd(fd), _registered(false)
+Client::Client(const int &fd) : _fd(fd), _registerLevel(0)
 {
 	if (_fd < 0)
 		throw (Client::EFE);
 }
 
-Client::Client(const Client &cpy) : _fd(cpy._fd), _registered(cpy._registered)
+Client::Client(const Client &cpy) : _fd(cpy._fd), _registerLevel(cpy._registerLevel)
 {
 	_nick = cpy._nick;
 	_buffer = cpy._buffer;
@@ -34,7 +34,7 @@ Client	&Client::operator=(const Client &cpy)
 {
 	_nick = cpy._nick;
 	_buffer = cpy._buffer;
-	_registered = cpy._registered;
+	_registerLevel = cpy._registerLevel;
 	return (*this);
 }
 

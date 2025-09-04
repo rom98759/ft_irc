@@ -65,7 +65,7 @@ static std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start)
 
 char	Server::pass(Client *const cl, const std::string &cmd)
 {
-	if (cl->isRegistered())
+	if (cl->getRegisterLevel() > 0)
 	{
 		cl->sendMessage("Error. Already registered.\r\n");
 		return (1);
@@ -80,7 +80,7 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 	if (pass == _pw)
 	{
 		cl->sendMessage("Match ! You are now registered.\r\n");
-		cl->setRegistered(1);
+		cl->upRegisterLevel();
 	}
 	else
 		cl->sendMessage("Wrong PASS. Please retry.\r\n");
@@ -427,6 +427,7 @@ bool	Server::handleClientMessage(Client *client)
 		pos = buffer.find("\r\n");
 		if (pos == std::string::npos)
 			break ;
+
 		std::string message = buffer.substr(0, pos);
 		client->clearBuffer();
 
