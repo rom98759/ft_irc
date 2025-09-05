@@ -18,6 +18,8 @@
 Server	*Server::_instance = NULL;
 bool	Server::_running = true;
 
+
+/* ****************************** |CDstructors| ****************************** */
 Server::Server(const unsigned short &port, const std::string &pw)
 	: _port(port), _pw(pw), _fd(-1) {}
 
@@ -33,7 +35,11 @@ Server::~Server(void)
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
+/* ****************************** |CDstructors| ****************************** */
 
+
+
+/* ******************************* |Operators| ******************************* */
 Server	&Server::operator+=(Client *const cl)
 {
 	_clients.push_back(cl);
@@ -53,16 +59,29 @@ Server	&Server::operator-=(Client *const cl)
 	}
 	return (*this);
 }
+/* ******************************* |Operators| ******************************* */
 
-static std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start)
+
+static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start)
 {
 	return (s.find_first_not_of(" \t\n\v\f\r", start));
 }
 
-/* ****************************| EVENTS/COMMANDS |**************************** */
+static char	ft_isValidNick(const std::string &nick)
+{
+	static const char *const	spec = {"[]{}\\|"};
+
+	for (std::size_t i = 0; i < nick.size(); ++i)
+		if (!std::isalnum(nick.at(i))
+			&& ((std::string)spec).find(nick.at(i)) == std::string::npos)
+			return (0);
+	return (1);
+}
+
+
+/* **************************** |EVENTS/COMMANDS| **************************** */
 /* ********* char	(Server::*)(Client *const, const std::string &); ********* */
 /* *************************************************************************** */
-
 char	Server::pass(Client *const cl, const std::string &cmd)
 {
 	if (cl->getRegisterLevel() > 0)
@@ -79,7 +98,7 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 	std::string	pass = cmd.substr(idx);
 	if (pass == _pw)
 	{
-		cl->sendMessage("Match ! You are now registered.\r\n");
+		cl->sendMessage("Match ! PASS is correct.\r\n");
 		cl->upRegisterLevel();
 	}
 	else
@@ -89,8 +108,30 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 
 char	Server::nick(Client *const cl, const std::string &cmd)
 {
-	(void) cmd;
-	cl->sendMessage("This feature isn't available.\r\n");
+	if (!cl->getRegisterLevel())
+	{
+		cl->sendMessage("Error. PASS avoided.\r\n");
+		return (1);
+	}
+	if (!cl->getNick().empty())
+	{
+		cl->sendMessage("Error. NICK already set.\r\n");
+		return (1);
+	}
+	std::size_t	idx = ft_skipSpaces(cmd, 4);
+	if (idx >= cmd.size())
+	{
+		cl->sendMessage("Error. No NICK give.\r\n");
+		return (1);
+	}
+	std::string	nick = cmd.substr(idx);
+	if (ft_isValidNick(nick))
+	{
+		cl->sendMessage("Valid NICK !\r\n");
+		cl->setNick(nick);
+	}
+	else
+		cl->sendMessage("Invalid NICK. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid.\r\n");
 	return (1);
 }
 
@@ -100,14 +141,16 @@ char	Server::user(Client *const cl, const std::string &cmd)
 	cl->sendMessage("This feature isn't available.\r\n");
 	return (1);
 }
-
 /* ****************************| EVENTS/COMMANDS |**************************** */
+
 
 inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::string &))
 {
 	_events.push_back(std::make_pair(cmd, f));
 }
 
+
+/* ****************************** |Server Init| ****************************** */
 void	Server::initEvents(void)
 {
 	addEvent("PASS", &Server::pass);
@@ -142,6 +185,8 @@ bool	Server::initServer(void)
 	std::cout << "Server listening on port " << _port << std::endl;
 	return true;
 }
+/* ****************************** |Server Init| ****************************** */
+
 
 // Initialiser les options du socket
 bool	Server::initSocketOptions(void)
@@ -195,6 +240,8 @@ bool	Server::bindAndListen(void)
 	return true;
 }
 
+
+/* ****************************** |Server Loop| ****************************** */
 void	Server::run(void)
 {
 	while (_running)
@@ -217,6 +264,15 @@ void	Server::run(void)
 		if (activity > 0)
 			handlePollEvents(activity);
 	}
+}
+
+// Static signal handler for SIGINT and SIGQUIT
+void	Server::signalHandler(int signum)
+{
+	std::cout << "\nInterrupt signal (" << signum << ") received.\n";
+	if (_instance)
+		_running = false;
+
 }
 
 // Configurer les structures pollfd pour le serveur et les clients
@@ -296,6 +352,7 @@ void	Server::handlePollEvents(int activity)
 	}
 }
 
+/* ********************* |Server Loop : Client Handling| ********************* */
 // Gère les données envoyées par un client
 void	Server::handleClientInput(size_t pollfdIndex)
 {
@@ -327,15 +384,6 @@ void	Server::handleClientError(size_t pollfdIndex)
 			break;
 		}
 	}
-}
-
-// Static signal handler for SIGINT and SIGQUIT
-void	Server::signalHandler(int signum)
-{
-	std::cout << "\nInterrupt signal (" << signum << ") received.\n";
-	if (_instance)
-		_running = false;
-
 }
 
 // Gère une nouvelle connexion au serveur
@@ -462,3 +510,6 @@ void	Server::disconnectClient(Client *client)
 	// Supprimer le client de la liste
 	*this -= client;
 }
+/* ********************* |Server Loop : Client Handling| ********************* */
+
+/* ****************************** |Server Loop| ****************************** */
