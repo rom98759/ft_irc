@@ -55,10 +55,13 @@ class	Server
 		void                        handleClientError(size_t pollfdIndex);
 		void						addEvent(const std::string &, char (Server::*)(Client *const, const std::string &));
 		void						initEvents(void);
+		void						mall(const std::string &msg) const;
 	private: /* -Events/Commands- */
 		char						pass(Client *const, const std::string &);
 		char						nick(Client *const, const std::string &);
 		char						user(Client *const, const std::string &);
+		char						ping(Client *const, const std::string &);
+		char						quit(Client *const, const std::string &);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
@@ -87,7 +90,7 @@ class	Server
 		bool                        configureClientSocket(int client_fd);
 		Client*                     createClient(int client_fd, struct sockaddr_in &client_addr);
 		bool                        handleClientMessage(Client *client);
-		void                        disconnectClient(Client *client);
+		void                        disconnectClient(Client *client, const std::string &reason);
 
 		// Gestion des signaux
 		static void					signalHandler(int sig);

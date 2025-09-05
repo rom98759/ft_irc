@@ -30,8 +30,12 @@ Behaviour:
 */
 Server::~Server(void)
 {
-	for (int i = 0; i < (int)_clients.size(); ++i)
-		delete (_clients[i]);
+	std::size_t	csize = _clients.size();
+	for (std::size_t i = 0; i < csize; ++i)
+	{
+		_clients[i]->sendMessage("Server shutdown.\r\n");
+		this->operator-=(_clients[i]);
+	}
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
@@ -48,7 +52,8 @@ Server	&Server::operator+=(Client *const cl)
 
 Server	&Server::operator-=(Client *const cl)
 {
-	for (int i = 0; i < (int)_clients.size(); ++i)
+	std::size_t	csize = _clients.size();
+	for (std::size_t i = 0; i < csize; ++i)
 	{
 		if (_clients[i] == cl)
 		{
@@ -62,7 +67,7 @@ Server	&Server::operator-=(Client *const cl)
 /* ******************************* |Operators| ******************************* */
 
 
-static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start)
+static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
 {
 	return (s.find_first_not_of(" \t\n\v\f\r", start));
 }
@@ -71,7 +76,8 @@ static char	ft_isValidNick(const std::string &nick)
 {
 	static const char *const	spec = {"[]{}\\|"};
 
-	for (std::size_t i = 0; i < nick.size(); ++i)
+	std::size_t	nsize = nick.size();
+	for (std::size_t i = 0; i < nsize; ++i)
 		if (!std::isalnum(nick.at(i))
 			&& ((std::string)spec).find(nick.at(i)) == std::string::npos)
 			return (0);
@@ -89,14 +95,13 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. Already registered.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd, 4);
+	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
 		cl->sendMessage("Error. No PASS given.\r\n");
 		return (1);
 	}
-	std::string	pass = cmd.substr(idx);
-	if (pass == _pw)
+	if (cmd.substr(idx) == _pw)
 	{
 		cl->sendMessage("Match ! PASS is correct.\r\n");
 		cl->upRegisterLevel();
@@ -118,7 +123,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. NICK already set.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd, 4);
+	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
 		cl->sendMessage("Error. No NICK give.\r\n");
@@ -141,6 +146,35 @@ char	Server::user(Client *const cl, const std::string &cmd)
 	cl->sendMessage("This feature isn't available.\r\n");
 	return (1);
 }
+
+char	Server::ping(Client *const cl, const std::string &cmd)
+{
+	if (!cl->isRegistered())
+		return (1);
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
+		return (1);
+	cl->sendMessage("PONG " + cmd.substr(idx) + "\r\n");
+	return (1);
+}
+
+char	Server::quit(Client *const cl, const std::string &cmd)
+{
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage("Please register before trying any operation.\r\n");
+		return (1);
+	}
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
+		cl->sendMessage("Error. Can't quit without any reason.\r\n");
+	else
+	{
+		cl->sendMessage("QUIT Successful !\r\n");
+		disconnectClient(cl, "QUIT: " + cmd.substr(idx));
+	}
+	return (1);
+}
 /* ****************************| EVENTS/COMMANDS |**************************** */
 
 
@@ -156,6 +190,8 @@ void	Server::initEvents(void)
 	addEvent("PASS", &Server::pass);
 	addEvent("NICK", &Server::nick);
 	addEvent("USER", &Server::user);
+	addEvent("PING", &Server::ping);
+	addEvent("QUIT", &Server::quit);
 }
 
 bool	Server::initServer(void)
@@ -187,6 +223,15 @@ bool	Server::initServer(void)
 }
 /* ****************************** |Server Init| ****************************** */
 
+
+void	Server::mall(const std::string &msg) const
+{
+	int	csize = _clients.size();
+
+	for (int i = 0; i < csize; ++i)
+		if (_clients[i]->isRegistered())
+			_clients[i]->sendMessage(msg);
+}
 
 // Initialiser les options du socket
 bool	Server::initSocketOptions(void)
@@ -288,7 +333,8 @@ void	Server::setupPollFds(void)
 	_pollfds.push_back(server_pollfd);
 
 	// Ajouter tous clients
-	for (size_t i = 0; i < _clients.size(); ++i)
+	std::size_t	csize = _clients.size();
+	for (std::size_t i = 0; i < csize; ++i)
 	{
 		pollfd client_pollfd;
 		client_pollfd.fd = _clients[i]->getFd();
@@ -336,7 +382,8 @@ void	Server::handlePollEvents(int activity)
 	// activité sockets clients si activity > 0
 	if (activity > 0)
 	{
-		for (size_t i = 1; i < _pollfds.size() && activity > 0; ++i)
+		std::size_t	psize = _pollfds.size();
+		for (std::size_t i = 1; i < psize && activity > 0; ++i)
 		{
 			if (_pollfds[i].revents & POLLIN)
 			{
@@ -357,14 +404,15 @@ void	Server::handlePollEvents(int activity)
 void	Server::handleClientInput(size_t pollfdIndex)
 {
 	// Trouver le client correspondant au descripteur
-	for (size_t j = 0; j < _clients.size(); ++j)
+	std::size_t	csize = _clients.size();
+	for (std::size_t j = 0; j < csize; ++j)
 	{
 		if (_clients[j]->getFd() == _pollfds[pollfdIndex].fd)
 		{
 			if (!handleClientMessage(_clients[j]))
 			{
 				// Client déconnecté donc delete
-				disconnectClient(_clients[j]);
+				disconnectClient(_clients[j], "[ERROR] Connection timeout");
 				break;
 			}
 		}
@@ -375,12 +423,13 @@ void	Server::handleClientInput(size_t pollfdIndex)
 void	Server::handleClientError(size_t pollfdIndex)
 {
 	// Gérer la déconnexion ou l'erreur
-	for (size_t j = 0; j < _clients.size(); ++j)
+	std::size_t	csize = _clients.size();
+	for (std::size_t j = 0; j < csize; ++j)
 	{
 		if (_clients[j]->getFd() == _pollfds[pollfdIndex].fd)
 		{
 			std::cout << "Client déconnecté ou erreur détectée (fd=" << _pollfds[pollfdIndex].fd << ")" << std::endl;
-			disconnectClient(_clients[j]);
+			disconnectClient(_clients[j], "[ERROR]");
 			break;
 		}
 	}
@@ -487,9 +536,10 @@ bool	Server::handleClientMessage(Client *client)
 
 		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": " << message << std::endl;
 
-		for (int i = 0; i < (int)_events.size(); ++i)
+		std::size_t	esize = _events.size();
+		for (std::size_t i = 0; i < esize; ++i)
 			if (ft_match(_events[i].first, message))
-				if (!((this->*_events[i].second)(client, message)))
+				if (!((this->*_events[i].second)(client, message.substr(_events[i].first.size()))))
 					return (0);
 
 		// Exemple : Echo du message reçu
@@ -500,15 +550,16 @@ bool	Server::handleClientMessage(Client *client)
 }
 
 // Déconnecte proprement un client
-void	Server::disconnectClient(Client *client)
+void	Server::disconnectClient(Client *client, const std::string &reason)
 {
 	std::cout << "Déconnexion du client fd=" << client->getFd() << std::endl;
 
-	// Envoyer message déconnexion autres clients si nécessaire
-	// TODO: implémentée apres gestion canaux
-
 	// Supprimer le client de la liste
+	char	known = client->isRegistered();
 	*this -= client;
+
+	if (known)
+		mall(client->getNick() + " left. //" + reason + "\r\n");
 }
 /* ********************* |Server Loop : Client Handling| ********************* */
 
