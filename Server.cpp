@@ -66,6 +66,12 @@ Server	&Server::operator-=(Client *const cl)
 	return (*this);
 }
 /* ******************************* |Operators| ******************************* */
+
+static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
+{
+	return (s.find_first_not_of(" \t\n\v\f\r", start));
+}
+
 static std::vector<std::string> split_irc(const std::string &line)
 {
 	std::vector<std::string> result;
@@ -87,8 +93,8 @@ static std::vector<std::string> split_irc(const std::string &line)
 	}
 
 	// DEBUG
-	for (std::size_t i = 0; i < result.size(); ++i)
-		std::cout << "Token[" << i << "]: '" << result[i] << "'" << std::endl;
+	// for (std::size_t i = 0; i < result.size(); ++i)
+	// 	std::cout << "Token[" << i << "]: '" << result[i] << "'" << std::endl;
 
 
 	return (result);
@@ -122,13 +128,13 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. Already registered.\r\n");
 		return (1);
 	}
-	std::vector<std::string> tokens = split_irc(cmd);
-	if (tokens.empty())
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
 	{
 		cl->sendMessage("Error. No PASS given.\r\n");
 		return (1);
 	}
-	if (tokens[0] == _pw)
+	if (cmd.substr(idx) == _pw)
 	{
 		cl->sendMessage("Match ! PASS is correct.\r\n");
 		cl->upRegisterLevel();
@@ -150,13 +156,13 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. NICK already set.\r\n");
 		return (1);
 	}
-	std::vector<std::string> tokens = split_irc(cmd);
-	if (tokens.empty())
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
 	{
 		cl->sendMessage("Error. No NICK give.\r\n");
 		return (1);
 	}
-	std::string	nick = tokens[0];
+	std::string	nick = cmd.substr(idx);
 	if (ft_isValidNick(nick))
 	{
 		cl->sendMessage("Valid NICK !\r\n");
@@ -178,10 +184,10 @@ char	Server::ping(Client *const cl, const std::string &cmd)
 {
 	if (!cl->isRegistered())
 		return (1);
-	std::vector<std::string> tokens = split_irc(cmd);
-	if (tokens.empty())
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
 		return (1);
-	cl->sendMessage("PONG " + tokens[0] + "\r\n");
+	cl->sendMessage("PONG " + cmd.substr(idx) + "\r\n");
 	return (1);
 }
 
@@ -192,13 +198,13 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Please register before trying any operation.\r\n");
 		return (1);
 	}
-	std::vector<std::string> tokens = split_irc(cmd);
-	if (tokens.empty())
+	std::size_t	idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
 		cl->sendMessage("Error. Can't quit without any reason.\r\n");
 	else
 	{
 		cl->sendMessage("QUIT Successful !\r\n");
-		disconnectClient(cl, "QUIT: " + tokens[0]);
+		disconnectClient(cl, "QUIT: " + cmd.substr(idx));
 	}
 	return (1);
 }
