@@ -4,3 +4,4 @@ obj/
 *.d
 
 compile_commands.json
+.vscode/

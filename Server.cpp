@@ -13,6 +13,7 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include <string.h> // Pour strerror
+#include <sstream> // Pour istringstream
 
 // Initialisation des variables statiques
 Server	*Server::_instance = NULL;
@@ -65,13 +66,39 @@ Server	&Server::operator-=(Client *const cl)
 	return (*this);
 }
 /* ******************************* |Operators| ******************************* */
-
-
-static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
+static std::vector<std::string> split_irc(const std::string &line)
 {
-	return (s.find_first_not_of(" \t\n\v\f\r", start));
-}
+	std::vector<std::string> result;
+	std::istringstream iss(line);
+	std::string word;
 
+	while (iss >> word)
+	{
+		if (word[0] == ':')
+		{
+			// On garde le ':' et on récupère le reste brut
+			std::string trailing;
+			std::getline(iss, trailing);
+			result.push_back(word.substr(1) + trailing); // Enlève ':' initial
+			break ;
+		}
+		else
+			result.push_back(word);
+	}
+
+	// DEBUG
+	for (std::size_t i = 0; i < result.size(); ++i)
+		std::cout << "Token[" << i << "]: '" << result[i] << "'" << std::endl;
+
+
+	return (result);
+}
+/*
+ * - Le pseudonyme ne doit pas être vide.
+ * - La longueur maximale du pseudonyme est de 9 caractères.
+ * - Le premier caractère doit être une lettre ou un caractère spécial autorisé.
+ * - Les caractères restants doivent être alphanumériques ou des caractères spéciaux autorisés.
+*/
 static char	ft_isValidNick(const std::string &nick)
 {
 	static const char *const	spec = {"[]{}\\|"};
@@ -95,13 +122,13 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. Already registered.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	std::vector<std::string> tokens = split_irc(cmd);
+	if (tokens.empty())
 	{
 		cl->sendMessage("Error. No PASS given.\r\n");
 		return (1);
 	}
-	if (cmd.substr(idx) == _pw)
+	if (tokens[0] == _pw)
 	{
 		cl->sendMessage("Match ! PASS is correct.\r\n");
 		cl->upRegisterLevel();
@@ -123,13 +150,13 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. NICK already set.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	std::vector<std::string> tokens = split_irc(cmd);
+	if (tokens.empty())
 	{
 		cl->sendMessage("Error. No NICK give.\r\n");
 		return (1);
 	}
-	std::string	nick = cmd.substr(idx);
+	std::string	nick = tokens[0];
 	if (ft_isValidNick(nick))
 	{
 		cl->sendMessage("Valid NICK !\r\n");
@@ -151,10 +178,10 @@ char	Server::ping(Client *const cl, const std::string &cmd)
 {
 	if (!cl->isRegistered())
 		return (1);
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	std::vector<std::string> tokens = split_irc(cmd);
+	if (tokens.empty())
 		return (1);
-	cl->sendMessage("PONG " + cmd.substr(idx) + "\r\n");
+	cl->sendMessage("PONG " + tokens[0] + "\r\n");
 	return (1);
 }
 
@@ -165,13 +192,13 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Please register before trying any operation.\r\n");
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	std::vector<std::string> tokens = split_irc(cmd);
+	if (tokens.empty())
 		cl->sendMessage("Error. Can't quit without any reason.\r\n");
 	else
 	{
 		cl->sendMessage("QUIT Successful !\r\n");
-		disconnectClient(cl, "QUIT: " + cmd.substr(idx));
+		disconnectClient(cl, "QUIT: " + tokens[0]);
 	}
 	return (1);
 }
@@ -500,10 +527,8 @@ Client	*Server::createClient(int client_fd, struct sockaddr_in &client_addr)
 
 static inline char	ft_match(const std::string &srvCmd, const std::string &clInput)
 {
-	std::size_t	sc = srvCmd.size();
-
-	return (clInput.size() > sc && srvCmd == clInput.substr(0, sc)
-		&& std::isspace(clInput.at(sc)));
+	std::vector<std::string> tokens = split_irc(clInput);
+	return (!tokens.empty() && tokens[0] == srvCmd);
 }
 
 // Gère les messages reçus d'un client
