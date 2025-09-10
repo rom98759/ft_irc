@@ -12,21 +12,29 @@
 
 #pragma once
 
+// Inclusions de la bibliothèque standard
 #include <iostream>
-#include <unistd.h>
+#include <string>
 #include <vector>
-#include <signal.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/time.h>
-#include <poll.h>
-#include <fcntl.h>
-#include <string.h>
+#include <cstring>  // Pour memset, strerror, etc.
+#include <sstream>  // Pour les opérations stringstream
 
-class	Client;
+// Inclusions système
+#include <unistd.h>     // Pour close, etc.
+#include <sys/socket.h> // Pour socket, bind, listen, etc.
+#include <netinet/in.h> // Pour sockaddr_in
+#include <arpa/inet.h>  // Pour inet_ntop
+#include <sys/time.h>   // Pour timeval
+#include <poll.h>       // Pour poll
+#include <fcntl.h>      // Pour fcntl
+#include <signal.h>     // Pour signal
+#include <errno.h>      // Pour errno
+
+// Inclusions du projet
+#include "IrcCodes.hpp"
+
+// Déclaration anticipée
+class Client;
 
 class	Server
 {
@@ -56,6 +64,8 @@ class	Server
 		void						addEvent(const std::string &, char (Server::*)(Client *const, const std::string &));
 		void						initEvents(void);
 		void						mall(const std::string &msg) const;
+		std::string                 formatMessage(const std::string &code, const std::string &target, const std::string &message) const;
+		std::string                 formatError(const std::string &code, const std::string &target, const std::string &message) const;
 	private: /* -Events/Commands- */
 		char						pass(Client *const, const std::string &);
 		char						nick(Client *const, const std::string &);
@@ -90,7 +100,7 @@ class	Server
 		void                        handleNewConnection(void);
 		bool                        configureClientSocket(int client_fd);
 		Client*                     createClient(int client_fd, struct sockaddr_in &client_addr);
-		bool                        handleClientMessage(Client *client);
+		int                         handleClientMessage(Client *client);
 		void                        disconnectClient(Client *client, const std::string &reason);
 
 		// Gestion des signaux

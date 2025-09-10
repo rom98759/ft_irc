@@ -12,9 +12,13 @@
 
 #pragma once
 
+// Inclusions de la bibliothèque standard
 #include <string>
 #include <iostream>
-#include <unistd.h>
+#include <exception>  // Pour std::exception
+
+// Inclusions système
+#include <unistd.h>  // Pour close
 
 class	ErrorFdException : public std::exception
 {

@@ -12,8 +12,6 @@
 
 #include "Server.hpp"
 #include "Client.hpp"
-#include <string.h> // Pour strerror
-#include <sstream> // Pour istringstream
 
 // Initialisation des variables statiques
 Server	*Server::_instance = NULL;
@@ -34,7 +32,7 @@ Server::~Server(void)
 	std::size_t	csize = _clients.size();
 	for (std::size_t i = 0; i < csize; ++i)
 	{
-		_clients[i]->sendMessage("Server shutdown.\r\n");
+		_clients[i]->sendMessage(formatMessage("NOTICE", _clients[i]->getNick().empty() ? "*" : _clients[i]->getNick(), "Server shutdown."));
 		this->operator-=(_clients[i]);
 	}
 	close(_fd);
@@ -67,39 +65,88 @@ Server	&Server::operator-=(Client *const cl)
 }
 /* ******************************* |Operators| ******************************* */
 
-static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
+/**
+ * Analyse une commande IRC et retourne ses paramètres
+ * @param message Le message complet
+ * @param command La commande à extraire (vide si on veut parser tout le message)
+ * @return Un vecteur contenant tous les paramètres
+ */
+static std::vector<std::string> parseIrcMessage(const std::string &message, const std::string &command = "")
+{
+	std::vector<std::string> params;
+
+	// Si une commande est spécifiée, extraire ce qui suit la commande
+	std::string paramStr;
+	if (command.empty())
+		paramStr = message;
+	else
+	{
+		size_t cmdPos = message.find(command);
+		if (cmdPos == std::string::npos)
+			return params; // Commande non trouvée
+
+		paramStr = message.substr(cmdPos + command.size());
+	}
+
+	// Ignorer les espaces initiaux
+	size_t start = paramStr.find_first_not_of(" \t\r\n\v\f");
+	if (start == std::string::npos)
+		return params; // Que des espaces
+
+	// Découper en paramètres
+	std::istringstream iss(paramStr.substr(start));
+	std::string token;
+
+	while (iss >> token)
+	{
+		// Si on trouve un paramètre commençant par ':', prendre tout le reste
+		if (token[0] == ':')
+		{
+			std::string trailing;
+			std::getline(iss, trailing);
+			params.push_back(token.substr(1) + trailing);
+			break;
+		}
+		else
+		{
+			params.push_back(token);
+		}
+	}
+
+	return params;
+}
+
+// Fonction utilitaire pour ignorer les espaces (gardée pour compatibilité)
+static std::size_t ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
 {
 	std::size_t pos = s.find_first_not_of(" \t\n\v\f\r", start);
 	return (pos == std::string::npos) ? s.length() : pos;
 }
 
-static std::vector<std::string> split_irc(const std::string &line)
+// Ces fonctions sont maintenues pour la compatibilité avec le code existant
+// mais utilisent maintenant les nouvelles fonctions de parsing
+
+static std::string extractCommandParams(const std::string &message, const std::string &command)
 {
-	std::vector<std::string> result;
-	std::istringstream iss(line);
-	std::string word;
+	std::vector<std::string> params = parseIrcMessage(message, command);
+	if (params.empty())
+		return "";
 
-	while (iss >> word)
+	// Si le premier paramètre commence par ':', c'est un trailing parameter
+	if (!params.empty() && params[0][0] == ':')
+		return params[0].substr(1);
+
+	// Sinon, concaténer tous les paramètres
+	std::string result;
+	for (size_t i = 0; i < params.size(); ++i)
 	{
-		if (word[0] == ':')
-		{
-			// On garde le ':' et on récupère le reste brut
-			std::string trailing;
-			std::getline(iss, trailing);
-			result.push_back(word.substr(1) + trailing); // Enlève ':' initial
-			break ;
-		}
-		else
-			result.push_back(word);
+		if (i > 0)
+			result += " ";
+		result += params[i];
 	}
-
-	// DEBUG
-	// for (std::size_t i = 0; i < result.size(); ++i)
-	// 	std::cout << "Token[" << i << "]: '" << result[i] << "'" << std::endl;
-
-
-	return (result);
+	return result;
 }
+
 /*
  * - Le pseudonyme ne doit pas être vide.
  * - La longueur maximale du pseudonyme est de 9 caractères.
@@ -142,13 +189,13 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 {
 	if (cl->getRegisterLevel() > 0)
 	{
-		cl->sendMessage("Error. Already registered.\r\n");
+		cl->sendMessage(formatError(ERR_ALREADYREGISTERED, cl->getNick().empty() ? "*" : cl->getNick(), "You may not reregister"));
 		return (1);
 	}
 	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
-		cl->sendMessage("Error. No PASS given.\r\n");
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, "*", "PASS :Not enough parameters"));
 		return (1);
 	}
 
@@ -160,11 +207,11 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 
 	if (input_pw == _pw)
 	{
-		cl->sendMessage("Match ! PASS is correct.\r\n");
+		cl->sendMessage(formatMessage("NOTICE", cl->getNick().empty() ? "*" : cl->getNick(), "Password accepted"));
 		cl->upRegisterLevel();
 	}
 	else
-		cl->sendMessage("Wrong PASS. Please retry.\r\n");
+		cl->sendMessage(formatError(ERR_PASSWDMISMATCH, "*", "Password incorrect"));
 	return (1);
 }
 
@@ -172,14 +219,14 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 {
 	if (!cl->getRegisterLevel())
 	{
-		cl->sendMessage("Error. PASS avoided.\r\n");
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered (use PASS first)"));
 		return (1);
 	}
 
 	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
-		cl->sendMessage("431 ERR_NONICKNAMEGIVEN :No nickname given\r\n");
+		cl->sendMessage(formatError(ERR_NONICKNAMEGIVEN, cl->getNick().empty() ? "*" : cl->getNick(), "No nickname given"));
 		return (1);
 	}
 
@@ -192,7 +239,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 	// Vérifier que le pseudo est valide
 	if (!ft_isValidNick(nick))
 	{
-		cl->sendMessage("432 ERR_ERRONEUSNICKNAME " + nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid.\r\n");
+		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid."));
 		return (1);
 	}
 
@@ -202,7 +249,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 	{
 		if (_clients[i] != cl && _clients[i]->getNick() == nick)
 		{
-			cl->sendMessage("433 ERR_NICKNAMEINUSE " + nick + " :Nickname is already in use\r\n");
+			cl->sendMessage(formatError(ERR_NICKNAMEINUSE, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Nickname is already in use"));
 			return (1);
 		}
 	}
@@ -212,6 +259,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 
 	// Stocker l'ancien pseudo pour notification (si changement)
 	std::string oldNick = cl->getNick();
+	std::string targetNick = isNewNick ? "*" : oldNick;
 
 	// Définir le nouveau pseudo
 	cl->setNick(nick);
@@ -220,17 +268,23 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 	if (isNewNick && !cl->isRegistered())
 	{
 		cl->upRegisterLevel();
-		cl->sendMessage("NICK " + nick + " :Nickname set successfully\r\n");
+		cl->sendMessage(formatMessage("NICK", nick, nick));
+
 		if (cl->isRegistered())
-			cl->sendMessage("Welcome " + nick + "! You are now fully registered.\r\n");
+		{
+			// Envoyer les messages de bienvenue standard IRC
+			cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
+			cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
+			cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
+		}
 		else
-			cl->sendMessage("Please complete registration with USER command.\r\n");
+			cl->sendMessage(formatMessage("NOTICE", nick, "Please complete registration with USER command."));
 	}
 	// Si c'est un changement de pseudo
 	else if (!isNewNick)
 	{
-		// cl->sendMessage(":" + oldNick + " change NICK to " + nick + "\r\n");
-		mall(":" + oldNick + " change NICK to " + nick + "\r\n");
+		std::string nickChangeMsg = ":" + oldNick + " NICK " + nick + "\r\n";
+		mall(nickChangeMsg);
 	}
 
 	return (1);
@@ -238,20 +292,31 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 
 char	Server::user(Client *const cl, const std::string &cmd)
 {
-	(void)cmd; // Ignorer le paramètre non utilisé
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
 
 	if (cl->getRegisterLevel() < 1)
 	{
-		cl->sendMessage("Error. PASS avoided.\r\n");
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered (use PASS first)"));
 		return (1);
 	}
 
 	// Vérifier que le client n'est pas déjà complètement enregistré
 	if (cl->isRegistered())
 	{
-		cl->sendMessage("Error. Already fully registered.\r\n");
+		cl->sendMessage(formatError(ERR_ALREADYREGISTERED, target, "You may not reregister"));
 		return (1);
 	}
+
+	// Vérifier si on a suffisamment de paramètres
+	std::size_t idx = ft_skipSpaces(cmd);
+	if (idx >= cmd.size())
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "USER :Not enough parameters"));
+		return (1);
+	}
+
+	// Idéalement, on devrait parser et stocker les informations USER ici
+	// USER <username> <hostname> <servername> :<realname>
 
 	// Si le niveau est à 2, c'est probablement que NICK a déjà été traité
 	// Dans ce cas, passer directement au niveau 3 (enregistrement complet)
@@ -259,65 +324,79 @@ char	Server::user(Client *const cl, const std::string &cmd)
 	{
 		cl->upRegisterLevel();
 		if (cl->isRegistered())
-			cl->sendMessage("Welcome " + cl->getNick() + "! You are now fully registered.\r\n");
+		{
+			// Envoyer les messages de bienvenue standard IRC
+			std::string nick = cl->getNick();
+			cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
+			cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
+			cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
+		}
 		else
-			cl->sendMessage("Please complete registration with NICK command.\r\n");
+			cl->sendMessage(formatMessage("NOTICE", target, "Please complete registration with NICK command."));
 		return (1);
 	}
 
 	// Sinon, si le niveau est à 1 (PASS validé mais NICK pas encore),
 	// on incrémente à 2 et on attend NICK
 	cl->upRegisterLevel();
-	cl->sendMessage("USER command received. Please set NICK to complete registration.\r\n");
+	cl->sendMessage(formatMessage("NOTICE", target, "USER command received. Please set NICK to complete registration."));
 	return (1);
 }
 
 char	Server::ping(Client *const cl, const std::string &cmd)
 {
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
 	if (!cl->isRegistered())
 	{
-		cl->sendMessage("Error. You must be registered to use PING command.\r\n");
-		cl->sendMessage("Current registration level: " + levelToString(cl->getRegisterLevel()) + " (needs to be 3)\r\n");
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		cl->sendMessage(formatMessage("NOTICE", target, "Current registration level: " + levelToString(cl->getRegisterLevel()) + " (needs to be 3)"));
 		return (1);
 	}
+
 	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
-		cl->sendMessage("Error. No token given after PING.\r\n");
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "PING :Not enough parameters"));
 		return (1);
 	}
+
 	// Extraire le token sans les espaces potentiels après
 	std::string token = cmd.substr(idx);
 	std::size_t end_token = token.find_first_of(" \t\n\v\f\r");
 	if (end_token != std::string::npos)
 		token = token.substr(0, end_token);
 
-	cl->sendMessage("PONG " + token + "\r\n");
+	// Répondre au PING avec un PONG (format standard IRC)
+	cl->sendMessage(formatMessage("PONG", "irc.server.com", token));
 	return (1);
 }
 
 char	Server::quit(Client *const cl, const std::string &cmd)
 {
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
 	if (!cl->isRegistered())
 	{
-		cl->sendMessage("Please register before trying any operation.\r\n");
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
-		cl->sendMessage("Error. Can't quit without any reason.\r\n");
-	else
-	{
-		cl->sendMessage("QUIT Successful !\r\n");
-		disconnectClient(cl, "QUIT: " + cmd.substr(idx));
-	}
+
+	// Utiliser la nouvelle fonction pour extraire les paramètres
+	std::vector<std::string> params = parseIrcMessage(cmd, "");
+	std::string quitMessage = params.empty() ? "Client Quit" : params[0];
+
+	// Message au format IRC standard pour les QUIT
+	cl->sendMessage(formatMessage("QUIT", cl->getNick(), "Quit: " + quitMessage));
+	disconnectClient(cl, quitMessage);
+
 	return (1);
 }
 
 // Fonction de débogage pour afficher l'état d'enregistrement du client
 char	Server::debug(Client *const cl, const std::string &cmd)
 {
-	(void)cmd; // Ignorer les paramètres
+	(void)cmd; // cmd n'est pas utilisé ici
 
 	std::string status = "--- DEBUG CLIENT STATUS ---\r\n";
 	status += "- Register Level: " + levelToString(cl->getRegisterLevel()) + "/3\r\n";
@@ -352,7 +431,6 @@ void	Server::initEvents(void)
 	addEvent("NICK", &Server::nick);
 	addEvent("USER", &Server::user);
 	addEvent("PING", &Server::ping);
-	addEvent("QUIT", &Server::quit);
 	addEvent("DEBUG", &Server::debug);
 }
 
@@ -385,6 +463,19 @@ bool	Server::initServer(void)
 }
 /* ****************************** |Server Init| ****************************** */
 
+
+// Fonction utilitaire pour formater les messages de réponse selon RFC
+std::string Server::formatMessage(const std::string &code, const std::string &target, const std::string &message) const
+{
+	std::string source = ":" + std::string("irc.server.com"); // Nom de votre serveur
+	return (source + " " + code + " " + target + " :" + message + "\r\n");
+}
+
+// Fonction utilitaire pour formater les messages d'erreur selon RFC
+std::string Server::formatError(const std::string &code, const std::string &target, const std::string &message) const
+{
+	return formatMessage(code, target, message);
+}
 
 void	Server::mall(const std::string &msg) const
 {
@@ -571,12 +662,20 @@ void	Server::handleClientInput(size_t pollfdIndex)
 	{
 		if (_clients[j]->getFd() == _pollfds[pollfdIndex].fd)
 		{
-			if (!handleClientMessage(_clients[j]))
+			int result = handleClientMessage(_clients[j]);
+
+			if (result == 0)
 			{
-				// Client déconnecté donc delete
+				// Client déconnecté brutalement, appeler disconnectClient
 				disconnectClient(_clients[j], "[ERROR] Connection timeout");
 				break;
 			}
+			else if (result == 2)
+			{
+				// Client déjà déconnecté via QUIT, ne rien faire de plus
+				break;
+			}
+			// Si result == 1, tout va bien, continuer
 		}
 	}
 }
@@ -618,7 +717,9 @@ void	Server::handleNewConnection(void)
 	// Créer nouveau client
 	Client* client = createClient(client_fd, client_addr);
 	if (client)
-		client->sendMessage("220 Welcome to IRC Server\r\n");
+		client->sendMessage(formatMessage("NOTICE", "Auth", "*** Looking up your hostname...") +
+							formatMessage("NOTICE", "Auth", "*** Found your hostname") +
+							formatMessage("NOTICE", "Auth", "*** Please enter password with /PASS <password>"));
 }
 
 // Configure un socket client en mode non-bloquant
@@ -660,19 +761,16 @@ Client	*Server::createClient(int client_fd, struct sockaddr_in &client_addr)
 	}
 }
 
-static inline char	ft_match(const std::string &srvCmd, const std::string &clInput)
-{
-	std::vector<std::string> tokens = split_irc(clInput);
-	return (!tokens.empty() && tokens[0] == srvCmd);
-}
-
 // Gère les messages reçus d'un client
-// Retourne false si le client s'est déconnecté
-bool	Server::handleClientMessage(Client *client)
+// Retourne:
+// 0 = Client s'est déconnecté brutalement (appeler disconnectClient)
+// 1 = Tout va bien, continuer
+// 2 = Client a quitté proprement via QUIT (ne pas appeler disconnectClient)
+int	Server::handleClientMessage(Client *client)
 {
 	if (!client->readFromSocket())
 	{
-		return false; // Client déconnecté
+		return 0; // Client déconnecté brutalement
 	}
 
 	size_t	pos;
@@ -696,34 +794,63 @@ bool	Server::handleClientMessage(Client *client)
 
 		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": " << message << std::endl;
 
+		// Découper le message en tokens pour identifier la commande
+		std::vector<std::string> tokens = parseIrcMessage(message);
+		if (tokens.empty())
+			continue;
+
+		std::string command = tokens[0];
+
+		// Vérifier si c'est une commande QUIT pour traitement spécial
+		if (command == "QUIT")
+		{
+			// Extraire les paramètres proprement
+			std::string params = extractCommandParams(message, "QUIT");
+
+			// Traiter la commande QUIT
+			this->quit(client, params);
+			// Indiquer que le client a été correctement déconnecté via QUIT
+			return 2;
+		}
+
+		// Traiter les autres commandes normalement
 		std::size_t	esize = _events.size();
 		for (std::size_t i = 0; i < esize; ++i)
-			if (ft_match(_events[i].first, message))
-				if (!((this->*_events[i].second)(client, message.substr(_events[i].first.size()))))
-					return (0);
+		{
+			if (_events[i].first == command)
+			{
+				// Extraire les paramètres proprement
+				std::string params = extractCommandParams(message, _events[i].first);
 
+				// Si la commande retourne 0, le client doit être déconnecté
+				if (!((this->*_events[i].second)(client, params)))
+					return 0;
+			}
+		}
 	}
 
-	return true;
+	return 1; // Tout va bien
 }
 
 // Déconnecte proprement un client
-void	Server::disconnectClient(Client *client, const std::string &reason)
+void Server::disconnectClient(Client *client, const std::string &reason)
 {
+	if (!client)
+		return;
+
 	std::cout << "Déconnexion du client fd=" << client->getFd() << std::endl;
 
-	// Sauvegarder les informations du client avant de le supprimer
+	// Sauvegarder les informations du client avant modification
 	bool isRegistered = client->isRegistered();
-	std::string nickname = "";
-	if (isRegistered)
-		nickname = client->getNick();
+	std::string nickname = isRegistered ? client->getNick() : "";
 
-	// Supprimer le client de la liste
+	// Envoyer le message de déconnexion AVANT de supprimer le client
+	if (isRegistered)
+		mall(formatMessage("QUIT", nickname, "Quit: " + reason));
+
+	// Supprimer le client à la fin
 	*this -= client;
-
-	// Envoyer le message de déconnexion seulement après avoir sauvegardé les infos
-	if (isRegistered)
-		mall(nickname + " left. //" + reason + "\r\n");
+	// Ne plus utiliser la variable client après cette ligne!
 }
 /* ********************* |Server Loop : Client Handling| ********************* */
 

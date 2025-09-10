@@ -10,11 +10,12 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <unistd.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <errno.h>
 #include "Client.hpp"
+
+// Inclusions système supplémentaires nécessaires pour l'implémentation
+#include <sys/socket.h>  // Pour recv, send
+#include <cstring>       // Pour memset, strerror
+#include <errno.h>       // Pour errno
 
 const ErrorFdException	Client::EFE;
 

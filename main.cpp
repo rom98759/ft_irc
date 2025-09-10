@@ -6,13 +6,10 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/26 12:02:16 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/02 17:08:00 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/10 15:00:58 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <sys/socket.h>
-#include <signal.h>
-#include <stdlib.h>
 #include "Server.hpp"
 #include "Client.hpp"
 
