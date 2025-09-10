@@ -62,6 +62,7 @@ class	Server
 		char						user(Client *const, const std::string &);
 		char						ping(Client *const, const std::string &);
 		char						quit(Client *const, const std::string &);
+		char						debug(Client *const, const std::string &);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);

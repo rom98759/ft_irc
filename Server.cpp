@@ -69,7 +69,8 @@ Server	&Server::operator-=(Client *const cl)
 
 static inline std::size_t	ft_skipSpaces(const std::string &s, const std::size_t &start = 0)
 {
-	return (s.find_first_not_of(" \t\n\v\f\r", start));
+	std::size_t pos = s.find_first_not_of(" \t\n\v\f\r", start);
+	return (pos == std::string::npos) ? s.length() : pos;
 }
 
 static std::vector<std::string> split_irc(const std::string &line)
@@ -117,6 +118,22 @@ static char	ft_isValidNick(const std::string &nick)
 	return (1);
 }
 
+static std::string levelToString(unsigned char level)
+{
+	if (level == 0b00)
+		return "0";
+	else if (level == 0b01)
+		return "1";
+	else if (level == 0b10)
+		return "2";
+	else if (level == 0b11)
+		return "3";
+
+	// Pour les autres valeurs (normalement impossible avec 2 bits)
+	std::stringstream ss;
+	ss << static_cast<int>(level);
+	return ss.str();
+}
 
 /* **************************** |EVENTS/COMMANDS| **************************** */
 /* ********* char	(Server::*)(Client *const, const std::string &); ********* */
@@ -134,7 +151,14 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. No PASS given.\r\n");
 		return (1);
 	}
-	if (cmd.substr(idx) == _pw)
+
+	// Ignorer les espaces et extraire uniquement le mot de passe
+	std::string input_pw = cmd.substr(idx);
+	std::size_t end_pw = input_pw.find_first_of(" \t\n\v\f\r");
+	if (end_pw != std::string::npos)
+		input_pw = input_pw.substr(0, end_pw);
+
+	if (input_pw == _pw)
 	{
 		cl->sendMessage("Match ! PASS is correct.\r\n");
 		cl->upRegisterLevel();
@@ -151,43 +175,124 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		cl->sendMessage("Error. PASS avoided.\r\n");
 		return (1);
 	}
-	if (!cl->getNick().empty())
-	{
-		cl->sendMessage("Error. NICK already set.\r\n");
-		return (1);
-	}
+
 	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
 	{
-		cl->sendMessage("Error. No NICK give.\r\n");
+		cl->sendMessage("431 ERR_NONICKNAMEGIVEN :No nickname given\r\n");
 		return (1);
 	}
-	std::string	nick = cmd.substr(idx);
-	if (ft_isValidNick(nick))
+
+	// Extraire uniquement le nickname sans les espaces potentiels après
+	std::string nick = cmd.substr(idx);
+	std::size_t end_nick = nick.find_first_of(" \t\n\v\f\r");
+	if (end_nick != std::string::npos)
+		nick = nick.substr(0, end_nick);
+
+	// Vérifier que le pseudo est valide
+	if (!ft_isValidNick(nick))
 	{
-		cl->sendMessage("Valid NICK !\r\n");
-		cl->setNick(nick);
+		cl->sendMessage("432 ERR_ERRONEUSNICKNAME " + nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid.\r\n");
+		return (1);
 	}
-	else
-		cl->sendMessage("Invalid NICK. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid.\r\n");
+
+	// Vérifier si le pseudo est déjà utilisé par un autre client
+	std::size_t clientsCount = _clients.size();
+	for (std::size_t i = 0; i < clientsCount; i++)
+	{
+		if (_clients[i] != cl && _clients[i]->getNick() == nick)
+		{
+			cl->sendMessage("433 ERR_NICKNAMEINUSE " + nick + " :Nickname is already in use\r\n");
+			return (1);
+		}
+	}
+
+	// Si le client n'a pas encore de pseudo, c'est une première définition
+	bool isNewNick = cl->getNick().empty();
+
+	// Stocker l'ancien pseudo pour notification (si changement)
+	std::string oldNick = cl->getNick();
+
+	// Définir le nouveau pseudo
+	cl->setNick(nick);
+
+	// Si c'est un nouveau pseudo et que le client n'est pas encore complètement enregistré
+	if (isNewNick && !cl->isRegistered())
+	{
+		cl->upRegisterLevel();
+		cl->sendMessage("NICK " + nick + " :Nickname set successfully\r\n");
+		if (cl->isRegistered())
+			cl->sendMessage("Welcome " + nick + "! You are now fully registered.\r\n");
+		else
+			cl->sendMessage("Please complete registration with USER command.\r\n");
+	}
+	// Si c'est un changement de pseudo
+	else if (!isNewNick)
+	{
+		// cl->sendMessage(":" + oldNick + " change NICK to " + nick + "\r\n");
+		mall(":" + oldNick + " change NICK to " + nick + "\r\n");
+	}
+
 	return (1);
 }
 
 char	Server::user(Client *const cl, const std::string &cmd)
 {
-	(void) cmd;
-	cl->sendMessage("This feature isn't available.\r\n");
+	(void)cmd; // Ignorer le paramètre non utilisé
+
+	if (cl->getRegisterLevel() < 1)
+	{
+		cl->sendMessage("Error. PASS avoided.\r\n");
+		return (1);
+	}
+
+	// Vérifier que le client n'est pas déjà complètement enregistré
+	if (cl->isRegistered())
+	{
+		cl->sendMessage("Error. Already fully registered.\r\n");
+		return (1);
+	}
+
+	// Si le niveau est à 2, c'est probablement que NICK a déjà été traité
+	// Dans ce cas, passer directement au niveau 3 (enregistrement complet)
+	if (cl->getRegisterLevel() == 2)
+	{
+		cl->upRegisterLevel();
+		if (cl->isRegistered())
+			cl->sendMessage("Welcome " + cl->getNick() + "! You are now fully registered.\r\n");
+		else
+			cl->sendMessage("Please complete registration with NICK command.\r\n");
+		return (1);
+	}
+
+	// Sinon, si le niveau est à 1 (PASS validé mais NICK pas encore),
+	// on incrémente à 2 et on attend NICK
+	cl->upRegisterLevel();
+	cl->sendMessage("USER command received. Please set NICK to complete registration.\r\n");
 	return (1);
 }
 
 char	Server::ping(Client *const cl, const std::string &cmd)
 {
 	if (!cl->isRegistered())
+	{
+		cl->sendMessage("Error. You must be registered to use PING command.\r\n");
+		cl->sendMessage("Current registration level: " + levelToString(cl->getRegisterLevel()) + " (needs to be 3)\r\n");
 		return (1);
+	}
 	std::size_t	idx = ft_skipSpaces(cmd);
 	if (idx >= cmd.size())
+	{
+		cl->sendMessage("Error. No token given after PING.\r\n");
 		return (1);
-	cl->sendMessage("PONG " + cmd.substr(idx) + "\r\n");
+	}
+	// Extraire le token sans les espaces potentiels après
+	std::string token = cmd.substr(idx);
+	std::size_t end_token = token.find_first_of(" \t\n\v\f\r");
+	if (end_token != std::string::npos)
+		token = token.substr(0, end_token);
+
+	cl->sendMessage("PONG " + token + "\r\n");
 	return (1);
 }
 
@@ -208,6 +313,29 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 	}
 	return (1);
 }
+
+// Fonction de débogage pour afficher l'état d'enregistrement du client
+char	Server::debug(Client *const cl, const std::string &cmd)
+{
+	(void)cmd; // Ignorer les paramètres
+
+	std::string status = "--- DEBUG CLIENT STATUS ---\r\n";
+	status += "- Register Level: " + levelToString(cl->getRegisterLevel()) + "/3\r\n";
+	status += "- Is Registered: " + std::string(cl->isRegistered() ? "Yes" : "No") + "\r\n";
+	status += "- Nickname: " + (cl->getNick().empty() ? "[Not Set]" : cl->getNick()) + "\r\n";
+	status += "- Binary RegisterLevel: ";
+
+	// Afficher la valeur binaire de _registerLevel
+	unsigned char level = cl->getRegisterLevel();
+	for (int i = 1; i >= 0; i--)
+		status += ((level >> i) & 1) ? "1" : "0";
+
+	status += "\r\n";
+	status += "-------------------------\r\n";
+
+	cl->sendMessage(status);
+	return (1);
+}
 /* ****************************| EVENTS/COMMANDS |**************************** */
 
 
@@ -225,6 +353,7 @@ void	Server::initEvents(void)
 	addEvent("USER", &Server::user);
 	addEvent("PING", &Server::ping);
 	addEvent("QUIT", &Server::quit);
+	addEvent("DEBUG", &Server::debug);
 }
 
 bool	Server::initServer(void)
@@ -573,8 +702,6 @@ bool	Server::handleClientMessage(Client *client)
 				if (!((this->*_events[i].second)(client, message.substr(_events[i].first.size()))))
 					return (0);
 
-		// Exemple : Echo du message reçu
-		// client->sendMessage("ECHO: " + message + "\r\n");
 	}
 
 	return true;
@@ -585,12 +712,18 @@ void	Server::disconnectClient(Client *client, const std::string &reason)
 {
 	std::cout << "Déconnexion du client fd=" << client->getFd() << std::endl;
 
+	// Sauvegarder les informations du client avant de le supprimer
+	bool isRegistered = client->isRegistered();
+	std::string nickname = "";
+	if (isRegistered)
+		nickname = client->getNick();
+
 	// Supprimer le client de la liste
-	char	known = client->isRegistered();
 	*this -= client;
 
-	if (known)
-		mall(client->getNick() + " left. //" + reason + "\r\n");
+	// Envoyer le message de déconnexion seulement après avoir sauvegardé les infos
+	if (isRegistered)
+		mall(nickname + " left. //" + reason + "\r\n");
 }
 /* ********************* |Server Loop : Client Handling| ********************* */
 
