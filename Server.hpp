@@ -43,7 +43,7 @@ class	Server
 		const std::string			_pw;
 		int							_fd;
 		std::vector<Client *>		_clients;
-		static Server*              _instance;
+		static Server*				_instance;
 		static bool					_running;
 		std::vector<
 			std::pair<
@@ -53,20 +53,20 @@ class	Server
 		>							_events;
 
 		// Structure pour poll()
-		std::vector<pollfd>         _pollfds;
+		std::vector<pollfd>			_pollfds;
 
 		// Méthodes privées pour l'organisation interne
-		void                        setupPollFds(void);
-		void                        handlePollEvents(int activity);
-		bool                        checkSocketErrors(int activity);
-		void                        handleClientInput(size_t pollfdIndex);
-		void                        handleClientError(size_t pollfdIndex);
-		void						addEvent(const std::string &, char (Server::*)(Client *const, const std::string &));
+		void						setupPollFds(void);
+		void						handlePollEvents(int activity);
+		bool						checkSocketErrors(int activity);
+		void						handleClientInput(size_t pollfdIndex);
+		void						handleClientError(size_t pollfdIndex);
 		void						initEvents(void);
 		void						mall(const std::string &msg) const;
-		std::string                 formatMessage(const std::string &code, const std::string &target, const std::string &message) const;
-		std::string                 formatError(const std::string &code, const std::string &target, const std::string &message) const;
+		std::string					formatMessage(const std::string &code, const std::string &target, const std::string &message) const;
+		std::string					formatError(const std::string &code, const std::string &target, const std::string &message) const;
 	private: /* -Events/Commands- */
+		void						addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::string &));
 		char						pass(Client *const, const std::string &);
 		char						nick(Client *const, const std::string &);
 		char						user(Client *const, const std::string &);
@@ -90,22 +90,25 @@ class	Server
 
 		// Méthodes d'initialisation
 		bool						initServer(void);
-		bool                        initSocketOptions(void);
-		bool                        bindAndListen(void);
+		bool						initSocketOptions(void);
+		bool						bindAndListen(void);
 
 		// Méthode principale
 		void						run(void);
 
 		// Gestion des clients
-		void                        handleNewConnection(void);
-		bool                        configureClientSocket(int client_fd);
-		Client*                     createClient(int client_fd, struct sockaddr_in &client_addr);
-		int                         handleClientMessage(Client *client);
-		void                        disconnectClient(Client *client, const std::string &reason);
+		void						handleNewConnection(void);
+		bool						configureClientSocket(int client_fd);
+		Client*						createClient(int client_fd, struct sockaddr_in &client_addr);
+		int							handleClientMessage(Client *client);
+		void						disconnectClient(Client *client, const std::string &reason);
 
 		// Gestion des signaux
 		static void					signalHandler(int sig);
 
 		// Setter de l'instance
-		static void                 setInstance(Server* srv) { _instance = srv; }
+		static void					setInstance(Server* srv) { _instance = srv; }
 };
+
+std::size_t					ft_skipSpaces(const std::string &s, const std::size_t &start = 0);
+std::vector<std::string>	parseIrcMessage(const std::string &message, const std::string &command = "");
