@@ -31,10 +31,11 @@ Server::~Server(void)
 {
 	std::size_t	csize = _clients.size();
 	for (std::size_t i = 0; i < csize; ++i)
-	{
 		_clients[i]->sendMessage(formatMessage("NOTICE", _clients[i]->getNick().empty() ? "*" : _clients[i]->getNick(), "Server shutdown."));
-		this->operator-=(_clients[i]);
-	}
+
+	while (!_clients.empty())
+
+		this->operator-=(_clients[0]);
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
