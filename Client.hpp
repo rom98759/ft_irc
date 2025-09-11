@@ -34,6 +34,8 @@ class	Client
 	private:
 		const int						_fd;
 		std::string						_nick;
+		std::string						_username;
+		std::string						_realname;
 		std::string						_buffer;     // Buffer stocker données reçues
 		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
 
@@ -44,10 +46,14 @@ class	Client
 		~Client(void);
 	public: /* -Setters- */
 		void							setNick(const std::string &nick) { _nick = nick; };
+		void							setUsername(const std::string &username) { _username = username; };
+		void							setRealname(const std::string &realname) { _realname = realname; };
 		void							upRegisterLevel(void) { ++_registerLevel; };
 	public: /* -Getters- */
 		const int						&getFd(void) const { return (_fd); };
 		const std::string				&getNick(void) const { return (_nick); };
+		const std::string				&getUsername(void) const { return (_username); };
+		const std::string				&getRealname(void) const { return (_realname); };
 		const std::string				&getBuffer(void) const { return (_buffer); };
 		bool							isRegistered(void) const { return (!(_registerLevel ^ 0b11)); };
 		unsigned char				getRegisterLevel(void) const { return (_registerLevel); };

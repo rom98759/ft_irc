@@ -13,7 +13,7 @@
 #include "Server.hpp"
 #include "Client.hpp"
 
-// Fonction utilitaire pour ignorer les espaces (gardée pour compatibilité)
+// Fonction utilitaire pour ignorer les espaces
 std::size_t ft_skipSpaces(const std::string &s, const std::size_t &start)
 {
 	std::size_t pos = s.find_first_not_of(" \t\n\v\f\r", start);
@@ -49,7 +49,6 @@ static std::string levelToString(unsigned char level)
 	else if (level == 0b11)
 		return "3";
 
-	// Pour les autres valeurs (normalement impossible avec 2 bits)
 	std::stringstream ss;
 	ss << static_cast<int>(level);
 	return ss.str();
@@ -72,7 +71,7 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Ignorer les espaces et extraire uniquement le mot de passe
+	// Ignorer espaces et extraire uniquement le mot de passe
 	std::string input_pw = cmd.substr(idx);
 	std::size_t end_pw = input_pw.find_first_of(" \t\n\v\f\r");
 	if (end_pw != std::string::npos)
@@ -103,20 +102,20 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Extraire uniquement le nickname sans les espaces potentiels après
+	// Extraire uniquement nickname sans espaces après
 	std::string nick = cmd.substr(idx);
 	std::size_t end_nick = nick.find_first_of(" \t\n\v\f\r");
 	if (end_nick != std::string::npos)
 		nick = nick.substr(0, end_nick);
 
-	// Vérifier que le pseudo est valide
+	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
 	{
 		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid."));
 		return (1);
 	}
 
-	// Vérifier si le pseudo est déjà utilisé par un autre client
+	// Vérifier pseudo déjà utilisé par autre client
 	std::size_t clientsCount = _clients.size();
 	for (std::size_t i = 0; i < clientsCount; i++)
 	{
@@ -127,17 +126,16 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		}
 	}
 
-	// Si le client n'a pas encore de pseudo, c'est une première définition
+	// Si client pas pseudo alors première définition
 	bool isNewNick = cl->getNick().empty();
 
-	// Stocker l'ancien pseudo pour notification (si changement)
+	// Stocker last pseudo notification (si changement)
 	std::string oldNick = cl->getNick();
 	std::string targetNick = isNewNick ? "*" : oldNick;
 
-	// Définir le nouveau pseudo
 	cl->setNick(nick);
 
-	// Si c'est un nouveau pseudo et que le client n'est pas encore complètement enregistré
+	// Si nouveau pseudo et client pas enregistré
 	if (isNewNick && !cl->isRegistered())
 	{
 		cl->upRegisterLevel();
@@ -145,7 +143,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 
 		if (cl->isRegistered())
 		{
-			// Envoyer les messages de bienvenue standard IRC
+			// messages bienvenue IRC
 			cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
 			cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
 			cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
@@ -153,7 +151,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		else
 			cl->sendMessage(formatMessage("NOTICE", nick, "Please complete registration with USER command."));
 	}
-	// Si c'est un changement de pseudo
+	// Si changement de pseudo
 	else if (!isNewNick)
 	{
 		std::string nickChangeMsg = ":" + oldNick + " NICK " + nick + "\r\n";
@@ -173,26 +171,23 @@ char	Server::user(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Vérifier que le client n'est pas déjà complètement enregistré
-	if (cl->isRegistered())
+	if (cl->isRegistered() || cl->getUsername().length() || cl->getRealname().length())
 	{
 		cl->sendMessage(formatError(ERR_ALREADYREGISTERED, target, "You may not reregister"));
 		return (1);
 	}
 
-	// Vérifier si on a suffisamment de paramètres
-	std::size_t idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
-	{
+	std::vector<std::string> params = parseIrcMessage(cmd, "");
+	if (params.size() < 4) {
 		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "USER :Not enough parameters"));
 		return (1);
 	}
 
-	// Idéalement, on devrait parser et stocker les informations USER ici
 	// USER <username> <hostname> <servername> :<realname>
+	cl->setUsername(params[0]);
+	cl->setRealname(params[3]);
 
-	// Si le niveau est à 2, c'est probablement que NICK a déjà été traité
-	// Dans ce cas, passer directement au niveau 3 (enregistrement complet)
+	// Si niveau 2 alors NICK traité
 	if (cl->getRegisterLevel() == 2)
 	{
 		cl->upRegisterLevel();
@@ -209,8 +204,7 @@ char	Server::user(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Sinon, si le niveau est à 1 (PASS validé mais NICK pas encore),
-	// on incrémente à 2 et on attend NICK
+	// PASS validé mais NICK pas encore
 	cl->upRegisterLevel();
 	cl->sendMessage(formatMessage("NOTICE", target, "USER command received. Please set NICK to complete registration."));
 	return (1);
@@ -234,13 +228,13 @@ char	Server::ping(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Extraire le token sans les espaces potentiels après
+	// Extraire token sans espaces après
 	std::string token = cmd.substr(idx);
 	std::size_t end_token = token.find_first_of(" \t\n\v\f\r");
 	if (end_token != std::string::npos)
 		token = token.substr(0, end_token);
 
-	// Répondre au PING avec un PONG (format standard IRC)
+	// PING -> PONG
 	cl->sendMessage(formatMessage("PONG", "irc.server.com", token));
 	return (1);
 }
@@ -255,29 +249,28 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	// Utiliser la nouvelle fonction pour extraire les paramètres
 	std::vector<std::string> params = parseIrcMessage(cmd, "");
 	std::string quitMessage = params.empty() ? "Client Quit" : params[0];
 
-	// Message au format IRC standard pour les QUIT
 	cl->sendMessage(formatMessage("QUIT", cl->getNick(), "Quit: " + quitMessage));
 	disconnectClient(cl, quitMessage);
 
 	return (1);
 }
 
-// Fonction de débogage pour afficher l'état d'enregistrement du client
+// Fonction débogage pour afficher l'état d'enregistrement du client
 char	Server::debug(Client *const cl, const std::string &cmd)
 {
-	(void)cmd; // cmd n'est pas utilisé ici
+	(void)cmd;
 
 	std::string status = "--- DEBUG CLIENT STATUS ---\r\n";
 	status += "- Register Level: " + levelToString(cl->getRegisterLevel()) + "/3\r\n";
 	status += "- Is Registered: " + std::string(cl->isRegistered() ? "Yes" : "No") + "\r\n";
 	status += "- Nickname: " + (cl->getNick().empty() ? "[Not Set]" : cl->getNick()) + "\r\n";
+	status += "- Username: " + (cl->getUsername().empty() ? "[Not Set]" : cl->getUsername()) + "\r\n";
+	status += "- Realname: " + (cl->getRealname().empty() ? "[Not Set]" : cl->getRealname()) + "\r\n";
 	status += "- Binary RegisterLevel: ";
 
-	// Afficher la valeur binaire de _registerLevel
 	unsigned char level = cl->getRegisterLevel();
 	for (int i = 1; i >= 0; i--)
 		status += ((level >> i) & 1) ? "1" : "0";
