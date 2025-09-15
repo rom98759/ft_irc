@@ -48,7 +48,7 @@ class	Server
 		std::vector<
 			std::pair<
 				const std::string,
-				char (Server::*)(Client *const, const std::string &)
+				char (Server::*)(Client *const, const std::vector<std::string> &tokens)
 			>
 		>							_events;
 
@@ -66,13 +66,13 @@ class	Server
 		std::string					formatMessage(const std::string &code, const std::string &target, const std::string &message) const;
 		std::string					formatError(const std::string &code, const std::string &target, const std::string &message) const;
 	private: /* -Events/Commands- */
-		void						addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::string &));
-		char						pass(Client *const, const std::string &);
-		char						nick(Client *const, const std::string &);
-		char						user(Client *const, const std::string &);
-		char						ping(Client *const, const std::string &);
-		char						quit(Client *const, const std::string &);
-		char						debug(Client *const, const std::string &);
+		void						addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::vector<std::string> &tokens));
+		char						pass(Client *const cl, const std::vector<std::string> &tokens);
+		char						nick(Client *const, const std::vector<std::string> &tokens);
+		char						user(Client *const, const std::vector<std::string> &tokens);
+		char						ping(Client *const, const std::vector<std::string> &tokens);
+		char						quit(Client *const, const std::vector<std::string> &tokens);
+		char						debug(Client *const, const std::vector<std::string> &tokens);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
@@ -110,5 +110,5 @@ class	Server
 		static void					setInstance(Server* srv) { _instance = srv; }
 };
 
-std::size_t					ft_skipSpaces(const std::string &s, const std::size_t &start = 0);
-std::vector<std::string>	parseIrcMessage(const std::string &message, const std::string &command = "");
+std::size_t								ft_skipSpaces(const std::string &s, const std::size_t &start = 0);
+const std::vector<std::string>	parseIrcMessage(const std::string &message);

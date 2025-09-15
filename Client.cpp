@@ -57,7 +57,6 @@ bool Client::readFromSocket(void)
 	{
 		buffer[bytesRead] = '\0';
 		appendToBuffer(buffer);
-		std::cout << "Reçu du client fd=" << _fd << ": " << buffer << std::endl;
 		return true;
 	}
 	// Client disconnected

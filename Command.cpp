@@ -57,29 +57,28 @@ static std::string levelToString(unsigned char level)
 /* **************************** |EVENTS/COMMANDS| **************************** */
 /* ********* char	(Server::*)(Client *const, const std::string &); ********* */
 /* *************************************************************************** */
-char	Server::pass(Client *const cl, const std::string &cmd)
+char	Server::pass(Client *const cl, const std::vector<std::string> &tokens)
 {
 	if (cl->getRegisterLevel() > 0)
 	{
 		cl->sendMessage(formatError(ERR_ALREADYREGISTERED, cl->getNick().empty() ? "*" : cl->getNick(), "You may not reregister"));
 		return (1);
 	}
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+
+	if (tokens.size() < 2)
 	{
 		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, "*", "PASS :Not enough parameters"));
 		return (1);
 	}
-
-	// Ignorer espaces et extraire uniquement le mot de passe
-	std::string input_pw = cmd.substr(idx);
-	std::size_t end_pw = input_pw.find_first_of(" \t\n\v\f\r");
-	if (end_pw != std::string::npos)
-		input_pw = input_pw.substr(0, end_pw);
-
-	if (input_pw == _pw)
+	if (tokens.size() != 2)
 	{
-		cl->sendMessage(formatMessage("NOTICE", cl->getNick().empty() ? "*" : cl->getNick(), "Password accepted"));
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, "*", "PASS :Too many parameters"));
+		return (1);
+	}
+
+	if (tokens.at(1) == _pw)
+	{
+		cl->sendMessage(formatMessage("NOTICE", "*", "Password accepted"));
 		cl->upRegisterLevel();
 	}
 	else
@@ -87,7 +86,7 @@ char	Server::pass(Client *const cl, const std::string &cmd)
 	return (1);
 }
 
-char	Server::nick(Client *const cl, const std::string &cmd)
+char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 {
 	if (!cl->getRegisterLevel())
 	{
@@ -95,18 +94,18 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	if (tokens.size() < 2)
 	{
 		cl->sendMessage(formatError(ERR_NONICKNAMEGIVEN, cl->getNick().empty() ? "*" : cl->getNick(), "No nickname given"));
 		return (1);
 	}
+	if (tokens.size() != 2)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, "*", "NICK :Too many parameters"));
+		return (1);
+	}
 
-	// Extraire uniquement nickname sans espaces après
-	std::string nick = cmd.substr(idx);
-	std::size_t end_nick = nick.find_first_of(" \t\n\v\f\r");
-	if (end_nick != std::string::npos)
-		nick = nick.substr(0, end_nick);
+	std::string nick = tokens.at(1);
 
 	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
@@ -161,7 +160,7 @@ char	Server::nick(Client *const cl, const std::string &cmd)
 	return (1);
 }
 
-char	Server::user(Client *const cl, const std::string &cmd)
+char	Server::user(Client *const cl, const std::vector<std::string> &tokens)
 {
 	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
 
@@ -177,40 +176,36 @@ char	Server::user(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	std::vector<std::string> params = parseIrcMessage(cmd, "");
-	if (params.size() < 4) {
+	if (tokens.size() < 5) {
 		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "USER :Not enough parameters"));
+		return (1);
+	}
+	if (tokens.size() != 5)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "USER :Too many parameters"));
 		return (1);
 	}
 
 	// USER <username> <hostname> <servername> :<realname>
-	cl->setUsername(params[0]);
-	cl->setRealname(params[3]);
+	cl->setUsername(tokens.at(1));
+	cl->setRealname(tokens.at(4));
 
-	// Si niveau 2 alors NICK traité
-	if (cl->getRegisterLevel() == 2)
-	{
-		cl->upRegisterLevel();
-		if (cl->isRegistered())
-		{
-			// Envoyer les messages de bienvenue standard IRC
-			std::string nick = cl->getNick();
-			cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
-			cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
-			cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
-		}
-		else
-			cl->sendMessage(formatMessage("NOTICE", target, "Please complete registration with NICK command."));
-		return (1);
-	}
-
-	// PASS validé mais NICK pas encore
 	cl->upRegisterLevel();
-	cl->sendMessage(formatMessage("NOTICE", target, "USER command received. Please set NICK to complete registration."));
+	if (cl->isRegistered())
+	{
+		// Envoyer les messages de bienvenue standard IRC
+		std::string nick = cl->getNick();
+		cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
+		cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
+		cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
+	}
+	else
+		cl->sendMessage(formatMessage("NOTICE", target, "USER command received. Please complete registration with NICK command."));
+
 	return (1);
 }
 
-char	Server::ping(Client *const cl, const std::string &cmd)
+char	Server::ping(Client *const cl, const std::vector<std::string> &tokens)
 {
 	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
 
@@ -221,25 +216,23 @@ char	Server::ping(Client *const cl, const std::string &cmd)
 		return (1);
 	}
 
-	std::size_t	idx = ft_skipSpaces(cmd);
-	if (idx >= cmd.size())
+	if (tokens.size() < 2)
 	{
 		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "PING :Not enough parameters"));
 		return (1);
 	}
-
-	// Extraire token sans espaces après
-	std::string token = cmd.substr(idx);
-	std::size_t end_token = token.find_first_of(" \t\n\v\f\r");
-	if (end_token != std::string::npos)
-		token = token.substr(0, end_token);
+	if (tokens.size() != 2)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "PING :Too many parameters"));
+		return (1);
+	}
 
 	// PING -> PONG
-	cl->sendMessage(formatMessage("PONG", "irc.server.com", token));
+	cl->sendMessage(formatMessage("PONG", "irc.server.com", tokens.at(1)));
 	return (1);
 }
 
-char	Server::quit(Client *const cl, const std::string &cmd)
+char	Server::quit(Client *const cl, const std::vector<std::string> &tokens)
 {
 	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
 
@@ -248,9 +241,18 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
 		return (1);
 	}
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "PING :Not enough parameters"));
+		return (1);
+	}
+	if (tokens.size() != 2)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "PING :Too many parameters"));
+		return (1);
+	}
 
-	std::vector<std::string> params = parseIrcMessage(cmd, "");
-	std::string quitMessage = params.empty() ? "Client Quit" : params[0];
+	std::string quitMessage = tokens.empty() ? cl->getNick() : tokens.at(1);
 
 	cl->sendMessage(formatMessage("QUIT", cl->getNick(), "Quit: " + quitMessage));
 	disconnectClient(cl, quitMessage);
@@ -259,9 +261,9 @@ char	Server::quit(Client *const cl, const std::string &cmd)
 }
 
 // Fonction débogage pour afficher l'état d'enregistrement du client
-char	Server::debug(Client *const cl, const std::string &cmd)
+char	Server::debug(Client *const cl, const std::vector<std::string> &tokens)
 {
-	(void)cmd;
+	(void)tokens;
 
 	std::string status = "--- DEBUG CLIENT STATUS ---\r\n";
 	status += "- Register Level: " + levelToString(cl->getRegisterLevel()) + "/3\r\n";

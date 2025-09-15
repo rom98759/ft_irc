@@ -69,33 +69,21 @@ Server	&Server::operator-=(Client *const cl)
 /**
  * Analyse une commande IRC et retourne ses paramètres
  * @param message Le message complet
- * @param command La commande à extraire (vide si on veut parser tout le message)
  * @return Un vecteur contenant tous les paramètres
  */
-std::vector<std::string> parseIrcMessage(const std::string &message, const std::string &command)
+const std::vector<std::string> parseIrcMessage(const std::string &message)
 {
 	std::vector<std::string> params;
 
-	// Si une commande est spécifiée, extraire ce qui suit la commande
-	std::string paramStr;
-	if (command.empty())
-		paramStr = message;
-	else
-	{
-		size_t cmdPos = message.find(command);
-		if (cmdPos == std::string::npos)
-			return params; // Commande non trouvée
-
-		paramStr = message.substr(cmdPos + command.size());
-	}
+	params.clear();
 
 	// Ignorer les espaces initiaux
-	size_t start = paramStr.find_first_not_of(" \t\r\n\v\f");
+	size_t start = message.find_first_not_of(" \t\r\n\v\f");
 	if (start == std::string::npos)
 		return params; // Que des espaces
 
 	// Découper en paramètres
-	std::istringstream iss(paramStr.substr(start));
+	std::istringstream iss(message.substr(start));
 	std::string token;
 
 	while (iss >> token)
@@ -117,34 +105,10 @@ std::vector<std::string> parseIrcMessage(const std::string &message, const std::
 	return params;
 }
 
-// Ces fonctions sont maintenues pour la compatibilité avec le code existant
-// mais utilisent maintenant les nouvelles fonctions de parsing
-
-static std::string extractCommandParams(const std::string &message, const std::string &command)
-{
-	std::vector<std::string> params = parseIrcMessage(message, command);
-	if (params.empty())
-		return "";
-
-	// Si le premier paramètre commence par ':', c'est un trailing parameter
-	if (!params.empty() && params[0][0] == ':')
-		return params[0].substr(1);
-
-	// Sinon, concaténer tous les paramètres
-	std::string result;
-	for (size_t i = 0; i < params.size(); ++i)
-	{
-		if (i > 0)
-			result += " ";
-		result += params[i];
-	}
-	return result;
-}
-
 /* ****************************| EVENTS/COMMANDS |**************************** */
 
 
-inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::string &))
+inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::vector<std::string> &tokens))
 {
 	_events.push_back(std::make_pair(cmd, f));
 }
@@ -499,43 +463,54 @@ int	Server::handleClientMessage(Client *client)
 		return 0; // Client déconnecté brutalement
 	}
 
-	size_t	pos;
 	while (69 != *(int *)"UNICORN")
 	{
 		std::string buffer = client->getBuffer();
 
-		// Si buffer avec fin de ligne
+		// Chercher la première fin de ligne complète
+		size_t pos = std::string::npos;
+		size_t lineEndSize = 0;
+
+		// D'abord chercher \r\n (protocole IRC standard)
 		pos = buffer.find("\r\n");
+		if (pos != std::string::npos)
+		{
+			lineEndSize = 2;
+		}
+		else
+		{
+			// Sinon chercher juste \n (compatibilité Unix)
+			pos = buffer.find("\n");
+			if (pos != std::string::npos)
+			{
+				lineEndSize = 1;
+			}
+		}
+
 		if (pos == std::string::npos)
-			break ;
+			break ; // Pas de ligne complète, attendre plus de données
 
 		std::string message = buffer.substr(0, pos);
 		client->clearBuffer();
 
-		if (pos + 2 < buffer.length())
+		if (pos + lineEndSize < buffer.length())
 		{
 			// Conserver reste buffer prochain passage
-			client->appendToBuffer(buffer.substr(pos + 2));
+			client->appendToBuffer(buffer.substr(pos + lineEndSize));
 		}
 
-		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": " << message << std::endl;
+		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": [" << message << "]" << std::endl;
 
 		// Découper le message en tokens pour identifier la commande
-		std::vector<std::string> tokens = parseIrcMessage(message);
+		const std::vector<std::string> tokens = parseIrcMessage(message);
 		if (tokens.empty())
 			continue;
 
 		std::string command = tokens[0];
 
-		// Vérifier si c'est une commande QUIT pour traitement spécial
 		if (command == "QUIT")
 		{
-			// Extraire les paramètres proprement
-			std::string params = extractCommandParams(message, "QUIT");
-
-			// Traiter la commande QUIT
-			this->quit(client, params);
-			// Indiquer que le client a été correctement déconnecté via QUIT
+			this->quit(client, tokens);
 			return 2;
 		}
 
@@ -545,11 +520,8 @@ int	Server::handleClientMessage(Client *client)
 		{
 			if (_events[i].first == command)
 			{
-				// Extraire les paramètres proprement
-				std::string params = extractCommandParams(message, _events[i].first);
-
 				// Si la commande retourne 0, le client doit être déconnecté
-				if (!((this->*_events[i].second)(client, params)))
+				if (!((this->*_events[i].second)(client, tokens)))
 					return 0;
 			}
 		}

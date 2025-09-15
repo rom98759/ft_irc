@@ -50,6 +50,7 @@
 #define ERR_NICKNAMEINUSE     "433" // Pseudo déjà utilisé
 #define ERR_NOTONCHANNEL      "442" // Vous n'êtes pas sur ce canal
 #define ERR_NOTREGISTERED     "451" // Vous n'êtes pas enregistré
+#define ERR_TOOMANYPARAMS     "460" // Trop de paramètres
 #define ERR_NEEDMOREPARAMS    "461" // Pas assez de paramètres
 #define ERR_ALREADYREGISTERED "462" // Déjà enregistré
 #define ERR_PASSWDMISMATCH    "464" // Mot de passe incorrect
