@@ -110,5 +110,4 @@ class	Server
 		static void					setInstance(Server* srv) { _instance = srv; }
 };
 
-std::size_t								ft_skipSpaces(const std::string &s, const std::size_t &start = 0);
 const std::vector<std::string>	parseIrcMessage(const std::string &message);

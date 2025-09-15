@@ -13,13 +13,6 @@
 #include "Server.hpp"
 #include "Client.hpp"
 
-// Fonction utilitaire pour ignorer les espaces
-std::size_t ft_skipSpaces(const std::string &s, const std::size_t &start)
-{
-	std::size_t pos = s.find_first_not_of(" \t\n\v\f\r", start);
-	return (pos == std::string::npos) ? s.length() : pos;
-}
-
 /*
  * - Le pseudonyme ne doit pas être vide.
  * - La longueur maximale du pseudonyme est de 9 caractères.
