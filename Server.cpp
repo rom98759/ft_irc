@@ -59,7 +59,27 @@ Server	&Server::operator-=(Client *const cl)
 		{
 			delete (cl);
 			_clients.erase(_clients.begin() + i);
-			break;
+			break ;
+		}
+	}
+	return (*this);
+}
+
+Server	&Server::operator+=(const Channel &ch)
+{
+	_channels.push_back(ch);
+	return (*this);
+}
+
+Server	&Server::operator-=(const Channel &ch)
+{
+	std::size_t	csize = _channels.size();
+	for (std::size_t i = 0; i < csize; ++i)
+	{
+		if (_channels[i] == ch)
+		{
+			_channels.erase(_channels.begin() + i);
+			break ;
 		}
 	}
 	return (*this);
@@ -105,13 +125,34 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 	return params;
 }
 
-/* ****************************| EVENTS/COMMANDS |**************************** */
-
-
 inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::vector<std::string> &tokens))
 {
 	_events.push_back(std::make_pair(cmd, f));
 }
+
+
+/* **************************** |Channel Related| **************************** */
+char	Server::createChannel(const std::string &name, const std::string &key)
+{
+	std::size_t	csize = _channels.size();
+	for (std::size_t i = 0; i < csize; ++i)
+		if (_channels[i].getName() == name)
+			return (0);
+
+	*this += Channel(name, key);
+	return (1);
+}
+
+const Channel	&Server::getChannel(const std::string &name) const
+{
+	std::size_t	csize = _channels.size();
+	for (std::size_t i = 0; i < csize; ++i)
+		if (_channels[i].getName() == name)
+			return (_channels[i]);
+	return (g_nChan);
+}
+/* **************************** |Channel Related| **************************** */
+
 
 
 /* ****************************** |Server Init| ****************************** */

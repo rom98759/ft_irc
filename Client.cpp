@@ -23,25 +23,36 @@ Client::Client(const int &fd) : _fd(fd), _registerLevel(0)
 {
 	if (_fd < 0)
 		throw (Client::EFE);
-}
-
-Client::Client(const Client &cpy) : _fd(cpy._fd), _registerLevel(cpy._registerLevel)
-{
-	_nick = cpy._nick;
-	_buffer = cpy._buffer;
-}
-
-Client	&Client::operator=(const Client &cpy)
-{
-	_nick = cpy._nick;
-	_buffer = cpy._buffer;
-	_registerLevel = cpy._registerLevel;
-	return (*this);
+	for (int i = 0; i < CHPERCL; ++i)
+		*(_channels + i) = g_nChan;
 }
 
 Client::~Client(void)
 {
 	close(_fd);
+}
+
+char	Client::operator+=(const Channel &ch)
+{
+	for (int i = 0; i < CHPERCL && *(_channels + i) != g_nChan; ++i)
+	{
+		*(_channels + i) = ch;
+		return (1);
+	}
+	return (0);
+}
+
+char	Client::operator-=(const Channel &ch)
+{
+	for (int i = 0; i < CHPERCL; ++i)
+	{
+		if (*(_channels + i) == ch)
+		{
+			*(_channels + i) = g_nChan;
+			return (1);
+		}
+	}
+	return (0);
 }
 
 bool Client::readFromSocket(void)

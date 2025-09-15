@@ -34,7 +34,11 @@
 #include "IrcCodes.hpp"
 
 // Déclaration anticipée
-class Client;
+class	Client;
+
+class	Channel;
+
+extern const Channel	g_nChan;
 
 class	Server
 {
@@ -51,6 +55,7 @@ class	Server
 				char (Server::*)(Client *const, const std::vector<std::string> &tokens)
 			>
 		>							_events;
+		std::vector<Channel>		_channels;
 
 		// Structure pour poll()
 		std::vector<pollfd>			_pollfds;
@@ -67,7 +72,7 @@ class	Server
 		std::string					formatError(const std::string &code, const std::string &target, const std::string &message) const;
 	private: /* -Events/Commands- */
 		void						addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::vector<std::string> &tokens));
-		char						pass(Client *const cl, const std::vector<std::string> &tokens);
+		char						pass(Client *const, const std::vector<std::string> &tokens);
 		char						nick(Client *const, const std::vector<std::string> &tokens);
 		char						user(Client *const, const std::vector<std::string> &tokens);
 		char						ping(Client *const, const std::vector<std::string> &tokens);
@@ -84,9 +89,12 @@ class	Server
 		const std::vector<Client *>	&getClients(void) const { return (_clients); };
 		static const Server			*getInstance(void) { return (_instance); };
 		static const bool			&isRunning(void) { return (_running); };
+		const std::vector<Channel>	&getChannels(void) const { return (_channels); };
 	public: /* -Methods- */
 		Server						&operator+=(Client *const cl);
 		Server						&operator-=(Client *const cl);
+		Server						&operator+=(const Channel &ch);
+		Server						&operator-=(const Channel &ch);
 
 		// Méthodes d'initialisation
 		bool						initServer(void);
@@ -102,6 +110,10 @@ class	Server
 		Client*						createClient(int client_fd, struct sockaddr_in &client_addr);
 		int							handleClientMessage(Client *client);
 		void						disconnectClient(Client *client, const std::string &reason);
+
+		// Gestion des cannaux
+		char						createChannel(const std::string &name, const std::string &key);
+		const Channel				&getChannel(const std::string &name) const;
 
 		// Gestion des signaux
 		static void					signalHandler(int sig);

@@ -12,6 +12,9 @@
 
 #include "Server.hpp"
 #include "Client.hpp"
+#include "Channel.hpp"
+
+const Channel	g_nChan("", ""); // Not a channel (Used to fill arrays of "no channels" => equivalent to NULL)
 
 static unsigned short	ft_atous(const char *const a)
 {

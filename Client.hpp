@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "Channel.hpp"
+
 // Inclusions de la bibliothèque standard
 #include <string>
 #include <iostream>
@@ -19,6 +21,8 @@
 
 // Inclusions système
 #include <unistd.h>  // Pour close
+
+#define CHPERCL 16
 
 class	ErrorFdException : public std::exception
 {
@@ -38,17 +42,11 @@ class	Client
 		std::string						_realname;
 		std::string						_buffer;     // Buffer stocker données reçues
 		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
+		Channel							_channels[CHPERCL];
 
 	public: /* -CDstructors- */
 		Client(const int &fd);
-		Client(const Client &cpy);
-		Client	&operator=(const Client &cpy);
 		~Client(void);
-	public: /* -Setters- */
-		void							setNick(const std::string &nick) { _nick = nick; };
-		void							setUsername(const std::string &username) { _username = username; };
-		void							setRealname(const std::string &realname) { _realname = realname; };
-		void							upRegisterLevel(void) { ++_registerLevel; };
 	public: /* -Getters- */
 		const int						&getFd(void) const { return (_fd); };
 		const std::string				&getNick(void) const { return (_nick); };
@@ -56,7 +54,16 @@ class	Client
 		const std::string				&getRealname(void) const { return (_realname); };
 		const std::string				&getBuffer(void) const { return (_buffer); };
 		bool							isRegistered(void) const { return (!(_registerLevel ^ 0b11)); };
-		unsigned char				getRegisterLevel(void) const { return (_registerLevel); };
+		unsigned char					getRegisterLevel(void) const { return (_registerLevel); };
+		const Channel					*getChannels(void) const { return (_channels); };
+	public: /* -Setters- */
+		void							setNick(const std::string &nick) { _nick = nick; };
+		void							setUsername(const std::string &username) { _username = username; };
+		void							setRealname(const std::string &realname) { _realname = realname; };
+		void							upRegisterLevel(void) { ++_registerLevel; };
+	public: /* -Operators- */
+		char							operator+=(const Channel &ch);
+		char							operator-=(const Channel &ch);
 	public: /* -Methods- */
 		bool							readFromSocket(void); // Lire des données depuis le socket
 		void							appendToBuffer(const std::string &data); // Ajouter des données au buffer

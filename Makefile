@@ -2,7 +2,7 @@ NAME = ircserv
 
 OBJDIR = obj/
 
-SRC = main.cpp Server.cpp Client.cpp Command.cpp
+SRC = main.cpp Server.cpp Client.cpp Command.cpp Channel.cpp
 OBJ = $(patsubst %.cpp,$(OBJDIR)%.o,$(notdir $(SRC)))
 DEP = $(patsubst %.cpp,$(OBJDIR)%.d,$(notdir $(SRC)))
 
