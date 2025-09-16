@@ -24,7 +24,7 @@ Client::Client(const int &fd) : _fd(fd), _registerLevel(0)
 	if (_fd < 0)
 		throw (Client::EFE);
 	for (int i = 0; i < CHPERCL; ++i)
-		*(_channels + i) = g_nChan;
+		*(_channels + i) = NULL;
 }
 
 Client::~Client(void)
@@ -32,27 +32,27 @@ Client::~Client(void)
 	close(_fd);
 }
 
-char	Client::operator+=(const Channel &ch)
+char	Client::operator+=(Channel *const ch)
 {
 	int	i = -1;
 	while (++i < CHPERCL)
 	{
 		if (*(_channels + i) == ch)
 			return (0);
-		if (*(_channels + i) == g_nChan)
+		if (!*(_channels + i))
 			break;
 	}
 	*(_channels + i) = ch;
 	return (1);
 }
 
-char	Client::operator-=(const Channel &ch)
+char	Client::operator-=(Channel *const ch)
 {
 	for (int i = 0; i < CHPERCL; ++i)
 	{
 		if (*(_channels + i) == ch)
 		{
-			*(_channels + i) = g_nChan;
+			*(_channels + i) = NULL;
 			return (1);
 		}
 	}
@@ -127,7 +127,7 @@ char	Client::cannotJoinNChannels(int n) const
 		return (1);
 	int	i = -1;
 	while (++i < CHPERCL)
-		if (*(_channels + i) == g_nChan)
+		if (*(_channels + i) == NULL)
 			break ;
 	return (n > (CHPERCL - i));
 }

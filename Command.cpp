@@ -294,6 +294,7 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		cl->sendMessage(formatError(ERR_TOOMANYCHANNELS, cl->getNick(), "JOIN :You plan to join too many channels"));
 		return (1);
 	}
+
 	std::vector<std::string>	keys;
 	std::size_t					ksize;
 	if (tokens.size() == 3)
@@ -308,32 +309,31 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 			cl->sendMessage(formatError(ERR_BADCHANMASK, chans[i], "JOIN :Bad channel mask"));
 			continue ;
 		}
-		Channel	targetChan = getChannel(chans[i]);
-		if (targetChan == g_nChan)
+		Channel	*targetChan = getChannel(chans[i]);
+		if (targetChan == NULL)
 		{
-			Channel	newChan(chans[i], i < ksize ? keys[i] : "");
-			*this += newChan;
-			targetChan = newChan;
+			targetChan = new Channel(chans[i], i < ksize ? keys[i] : "");
+			*this += targetChan;
 		}
-		else if (targetChan.isFull())
+		else if (targetChan->isFull())
 		{
-			cl->sendMessage(formatError(ERR_CHANNELISFULL, targetChan.getName(), "JOIN :Channel full"));
+			cl->sendMessage(formatError(ERR_CHANNELISFULL, targetChan->getName(), "JOIN :Channel full"));
 			continue ;
 		}
-		std::string	key = targetChan.getKey();
+		std::string	key = targetChan->getKey();
 		if (!key.empty() && key != (i < ksize ? keys[i] : ""))
 		{
-			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan.getName(), "JOIN :Bad channel key"));
+			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan->getName(), "JOIN :Bad channel key"));
 			continue ;
 		}
 		if (!(*cl += targetChan))
 		{
-			cl->sendMessage(formatMessage("Can't join", targetChan.getName(), "JOIN :Channel already joined"));
+			cl->sendMessage(formatMessage("Can't join", targetChan->getName(), "JOIN :Channel already joined"));
 			continue ;
 		}
-		targetChan += cl;
+		*targetChan += cl;
 		// TODO: Send other steps of Welcome : TOPIC (if it has) | The list of every user bound to the channel.
-		cl->sendMessage(formatMessage("Joined", targetChan.getName(), "JOIN :Channel successfully joined"));
+		cl->sendMessage(formatMessage("Joined", targetChan->getName(), "JOIN :Channel successfully joined"));
 		// TODO: Tell everyone in the channel cl joined.
 	}
 	return (1);
@@ -361,15 +361,15 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 	std::size_t					csize = chans.size();
 	for (std::size_t i = 0; i < csize; ++i)
 	{
-		Channel	targetChan = getChannel(chans[i]);
-		if (targetChan == g_nChan)
+		Channel	*targetChan = getChannel(chans[i]);
+		if (targetChan == NULL)
 		{
 			cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, chans[i], "PART :No such channel"));
 			continue ;
 		}
 		if (*cl -= targetChan)
 		{
-			targetChan -= cl;
+			*targetChan -= cl;
 			cl->sendMessage(formatMessage(cl->getNick(), chans[i], "PART :Left"));
 			// TODO: Send to all cl has quit the channel with reason if it has.
 		}

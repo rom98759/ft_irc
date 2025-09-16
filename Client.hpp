@@ -42,7 +42,7 @@ class	Client
 		std::string						_realname;
 		std::string						_buffer;     // Buffer stocker données reçues
 		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
-		Channel							_channels[CHPERCL];
+		Channel							*_channels[CHPERCL];
 
 	public: /* -CDstructors- */
 		Client(const int &fd);
@@ -55,15 +55,15 @@ class	Client
 		const std::string				&getBuffer(void) const { return (_buffer); };
 		bool							isRegistered(void) const { return (!(_registerLevel ^ 0b11)); };
 		unsigned char					getRegisterLevel(void) const { return (_registerLevel); };
-		const Channel					*getChannels(void) const { return (_channels); };
+		Channel							**getChannels(void) const { return ((Channel **)_channels); };
 	public: /* -Setters- */
 		void							setNick(const std::string &nick) { _nick = nick; };
 		void							setUsername(const std::string &username) { _username = username; };
 		void							setRealname(const std::string &realname) { _realname = realname; };
 		void							upRegisterLevel(void) { ++_registerLevel; };
 	public: /* -Operators- */
-		char							operator+=(const Channel &ch);
-		char							operator-=(const Channel &ch);
+		char							operator+=(Channel *const ch);
+		char							operator-=(Channel *const ch);
 	public: /* -Methods- */
 		bool							readFromSocket(void); // Lire des données depuis le socket
 		void							appendToBuffer(const std::string &data); // Ajouter des données au buffer

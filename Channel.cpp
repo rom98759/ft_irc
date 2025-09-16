@@ -43,13 +43,3 @@ Channel	&Channel::operator-=(Client *const cl)
 	}
 	return (*this);
 }
-
-char	Channel::operator==(const Channel &ch) const
-{
-	return (this->getName() == ch.getName());
-}
-
-char	Channel::operator!=(const Channel &ch) const
-{
-	return (this->getName() != ch.getName());
-}

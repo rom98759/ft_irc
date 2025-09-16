@@ -34,8 +34,10 @@ Server::~Server(void)
 		_clients[i]->sendMessage(formatMessage("NOTICE", _clients[i]->getNick().empty() ? "*" : _clients[i]->getNick(), "Server shutdown."));
 
 	while (!_clients.empty())
+		disconnectClient(_clients[0], "Server shutdown");
 
-		this->operator-=(_clients[0]);
+	while (!_channels.empty())
+		*this -= _channels[0];
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
@@ -65,19 +67,20 @@ Server	&Server::operator-=(Client *const cl)
 	return (*this);
 }
 
-Server	&Server::operator+=(const Channel &ch)
+Server	&Server::operator+=(Channel *const ch)
 {
 	_channels.push_back(ch);
 	return (*this);
 }
 
-Server	&Server::operator-=(const Channel &ch)
+Server	&Server::operator-=(Channel *const ch)
 {
 	std::size_t	csize = _channels.size();
 	for (std::size_t i = 0; i < csize; ++i)
 	{
 		if (_channels[i] == ch)
 		{
+			delete (ch);
 			_channels.erase(_channels.begin() + i);
 			break ;
 		}
@@ -132,13 +135,13 @@ inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *c
 
 
 /* **************************** |Channel Related| **************************** */
-const Channel	&Server::getChannel(const std::string &name) const
+Channel	*Server::getChannel(const std::string &name) const
 {
 	std::size_t	csize = _channels.size();
 	for (std::size_t i = 0; i < csize; ++i)
-		if (_channels[i].getName() == name)
+		if (_channels[i]->getName() == name)
 			return (_channels[i]);
-	return (g_nChan);
+	return (NULL);
 }
 /* **************************** |Channel Related| **************************** */
 
@@ -576,7 +579,18 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 
 	// Envoyer le message de déconnexion AVANT de supprimer le client
 	if (isRegistered)
+	{
+		Channel	**const chans = client->getChannels();
+		for (int i = 0; i < CHPERCL; ++i)
+		{
+			if (*(chans + i) != NULL)
+			{
+				// TODO: Notify clients on channel
+				**(chans + i) -= client;
+			}
+		}
 		mall(formatMessage("QUIT", nickname, "Quit: " + reason));
+	}
 
 	// Supprimer le client à la fin
 	*this -= client;
