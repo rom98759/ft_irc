@@ -38,17 +38,18 @@ Channel	&Channel::operator-=(Client *const cl)
 		if (_list[i].first == cl)
 		{
 			_list.erase(_list.begin() + i);
+			break ;
 		}
 	}
 	return (*this);
 }
 
-char	Channel::operator==(const Channel &ch)
+char	Channel::operator==(const Channel &ch) const
 {
 	return (this->getName() == ch.getName());
 }
 
-char	Channel::operator!=(const Channel &ch)
+char	Channel::operator!=(const Channel &ch) const
 {
 	return (this->getName() != ch.getName());
 }

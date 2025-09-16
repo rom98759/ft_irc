@@ -69,6 +69,7 @@ class	Client
 		void							appendToBuffer(const std::string &data); // Ajouter des données au buffer
 		void							clearBuffer(void) { _buffer.clear(); }; // Vider le buffer
 		bool							sendMessage(const std::string &message); // Envoyer un message au client
+		char							cannotJoinNChannels(int n) const;
 	public: /* -Exceptions- */
 		static const ErrorFdException	EFE;
 };

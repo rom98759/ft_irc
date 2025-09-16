@@ -36,6 +36,7 @@ class	Channel
 		const std::string		getName(void) const { return (_name); };
 		const int				&getClientsLimit(void) const { return (_clientsLimit); };
 		const std::string		&getKey(void) const { return (_key); };
+		char				isFull(void) const { return ((int)_list.size() == _clientsLimit); };
 	public: /* -Setters- */
 		void					setName(const std::string &newName) { _name = newName; };
 		void					setClientsLimit(const int &i) { _clientsLimit = i; };
@@ -43,8 +44,8 @@ class	Channel
 	public: /* -Operators- */
 		Channel					&operator+=(Client *const);
 		Channel					&operator-=(Client *const);
-		char					operator==(const Channel &);
-		char					operator!=(const Channel &);
+		char					operator==(const Channel &) const;
+		char					operator!=(const Channel &) const;
 };
 
 extern const Channel	g_nChan;

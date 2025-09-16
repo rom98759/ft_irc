@@ -77,6 +77,8 @@ class	Server
 		char						user(Client *const, const std::vector<std::string> &tokens);
 		char						ping(Client *const, const std::vector<std::string> &tokens);
 		char						quit(Client *const, const std::vector<std::string> &tokens);
+		char						join(Client *const, const std::vector<std::string> &tokens);
+		char						part(Client *const, const std::vector<std::string> &tokens);
 		char						debug(Client *const, const std::vector<std::string> &tokens);
 
 	public: /* -CDstructors- */

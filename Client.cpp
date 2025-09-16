@@ -34,12 +34,16 @@ Client::~Client(void)
 
 char	Client::operator+=(const Channel &ch)
 {
-	for (int i = 0; i < CHPERCL && *(_channels + i) != g_nChan; ++i)
+	int	i = -1;
+	while (++i < CHPERCL)
 	{
-		*(_channels + i) = ch;
-		return (1);
+		if (*(_channels + i) == ch)
+			return (0);
+		if (*(_channels + i) == g_nChan)
+			break;
 	}
-	return (0);
+	*(_channels + i) = ch;
+	return (1);
 }
 
 char	Client::operator-=(const Channel &ch)
@@ -115,4 +119,15 @@ bool Client::sendMessage(const std::string &message)
 	}
 
 	return true;
+}
+
+char	Client::cannotJoinNChannels(int n) const
+{
+	if (n > CHPERCL)
+		return (1);
+	int	i = -1;
+	while (++i < CHPERCL)
+		if (*(_channels + i) == g_nChan)
+			break ;
+	return (n > (CHPERCL - i));
 }

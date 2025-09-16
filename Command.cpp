@@ -47,6 +47,22 @@ static std::string levelToString(unsigned char level)
 	return ss.str();
 }
 
+static const std::vector<std::string>	ft_split(const std::string &str, const char &sep)
+{
+	std::vector<std::string>	recipients;
+	std::size_t					start = 0;
+	std::size_t					end = str.find(sep);
+
+	while (end != std::string::npos)
+	{
+		recipients.push_back(str.substr(start, end - start));
+		start = end + 1;
+		end = str.find(sep, start);
+	}
+	recipients.push_back(str.substr(start));
+	return (recipients);
+}
+
 /* **************************** |EVENTS/COMMANDS| **************************** */
 /* ********* char	(Server::*)(Client *const, const std::string &); ********* */
 /* *************************************************************************** */
@@ -250,6 +266,119 @@ char	Server::quit(Client *const cl, const std::vector<std::string> &tokens)
 	cl->sendMessage(formatMessage("QUIT", cl->getNick(), "Quit: " + quitMessage));
 	disconnectClient(cl, quitMessage);
 
+	return (1);
+}
+
+char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
+{
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered"));
+		return (1);
+	}
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, cl->getNick(), "JOIN :Not enough parameters"));
+		return (1);
+	}
+	if (tokens.size() > 3)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, cl->getNick(), "JOIN :Too many parameters"));
+		return (1);
+	}
+	std::vector<std::string>	chans = ft_split(tokens[1], ',');
+	std::size_t					csize = chans.size();
+	// TODO: Determine wether we handle (and how) empty strings or not
+	if (cl->cannotJoinNChannels(csize))
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYCHANNELS, cl->getNick(), "JOIN :You plan to join too many channels"));
+		return (1);
+	}
+	std::vector<std::string>	keys;
+	std::size_t					ksize;
+	if (tokens.size() == 3)
+		keys = ft_split(tokens[2], ',');
+	ksize = keys.size();
+	for (std::size_t i = 0; i < csize; ++i)
+	{
+		// TODO: Verify if it is a channel (# as first character) (We maybe won't handle local channels = no &).
+		// TODO: Verify valid name overall (No ' ', no '^G', no ',').
+		if (chans[i].empty())
+		{
+			cl->sendMessage(formatError(ERR_BADCHANMASK, chans[i], "JOIN :Bad channel mask"));
+			continue ;
+		}
+		Channel	targetChan = getChannel(chans[i]);
+		if (targetChan == g_nChan)
+		{
+			Channel	newChan(chans[i], i < ksize ? keys[i] : "");
+			*this += newChan;
+			targetChan = newChan;
+		}
+		else if (targetChan.isFull())
+		{
+			cl->sendMessage(formatError(ERR_CHANNELISFULL, targetChan.getName(), "JOIN :Channel full"));
+			continue ;
+		}
+		std::string	key = targetChan.getKey();
+		if (!key.empty() && key != (i < ksize ? keys[i] : ""))
+		{
+			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan.getName(), "JOIN :Bad channel key"));
+			continue ;
+		}
+		if (!(*cl += targetChan))
+		{
+			cl->sendMessage(formatMessage("Can't join", targetChan.getName(), "JOIN :Channel already joined"));
+			continue ;
+		}
+		targetChan += cl;
+		// TODO: Send other steps of Welcome : TOPIC (if it has) | The list of every user bound to the channel.
+		cl->sendMessage(formatMessage("Joined", targetChan.getName(), "JOIN :Channel successfully joined"));
+		// TODO: Tell everyone in the channel cl joined.
+	}
+	return (1);
+}
+
+char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
+{
+	if (!(cl->isRegistered()))
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered"));
+		return (1);
+	}
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, cl->getNick(), "PART :Not enough parameters"));
+		return (1);
+	}
+	if (tokens.size() > 3)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, cl->getNick(), "PART :Too many parameters"));
+		return (1);
+	}
+
+	std::vector<std::string>	chans = ft_split(tokens[1], ',');
+	std::size_t					csize = chans.size();
+	for (std::size_t i = 0; i < csize; ++i)
+	{
+		Channel	targetChan = getChannel(chans[i]);
+		if (targetChan == g_nChan)
+		{
+			cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, chans[i], "PART :No such channel"));
+			continue ;
+		}
+		if (*cl -= targetChan)
+		{
+			targetChan -= cl;
+			cl->sendMessage(formatMessage(cl->getNick(), chans[i], "PART :Left"));
+			// TODO: Send to all cl has quit the channel with reason if it has.
+		}
+		else
+		{
+			cl->sendMessage(formatError(ERR_NOTONCHANNEL, chans[i], "PART :Not on channel"));
+			continue ;
+		}
+	}
 	return (1);
 }
 

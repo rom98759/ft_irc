@@ -132,17 +132,6 @@ inline void	Server::addEvent(const std::string &cmd, char (Server::*f)(Client *c
 
 
 /* **************************** |Channel Related| **************************** */
-char	Server::createChannel(const std::string &name, const std::string &key)
-{
-	std::size_t	csize = _channels.size();
-	for (std::size_t i = 0; i < csize; ++i)
-		if (_channels[i].getName() == name)
-			return (0);
-
-	*this += Channel(name, key);
-	return (1);
-}
-
 const Channel	&Server::getChannel(const std::string &name) const
 {
 	std::size_t	csize = _channels.size();
@@ -162,6 +151,8 @@ void	Server::initEvents(void)
 	addEvent("NICK", &Server::nick);
 	addEvent("USER", &Server::user);
 	addEvent("PING", &Server::ping);
+	addEvent("JOIN", &Server::join);
+	addEvent("PART", &Server::part);
 	addEvent("DEBUG", &Server::debug);
 }
 

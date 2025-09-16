@@ -43,6 +43,7 @@
 #define ERR_NOSUCHNICK        "401" // Pseudo/canal inexistant
 #define ERR_NOSUCHCHANNEL     "403" // Canal inexistant
 #define ERR_CANNOTSENDTOCHAN  "404" // Impossible d'envoyer au canal
+#define ERR_TOOMANYCHANNELS   "405" // Limite de canaux connectés atteinte
 #define ERR_UNKNOWNCOMMAND    "421" // Commande inconnue
 #define ERR_NOMOTD            "422" // MOTD manquant
 #define ERR_NONICKNAMEGIVEN   "431" // Aucun pseudo fourni
