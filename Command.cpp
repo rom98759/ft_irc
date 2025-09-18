@@ -401,6 +401,14 @@ char	Server::debug(Client *const cl, const std::vector<std::string> &tokens)
 
 	status += "\r\n";
 	status += "-------------------------\r\n";
+	status += "--- DEBUG CLIENT CHANNELS ---\r\n";
+	Channel **chans = cl->getChannels();
+	for (int i = 0; i < CHPERCL; ++i)
+	{
+		if (chans[i] != NULL)
+			status += "  - " + chans[i]->getName() + "\r\n";
+	}
+	status += "----------------------------\r\n";
 
 	cl->sendMessage(status);
 	return (1);
@@ -441,16 +449,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 	std::string message = tokens.at(2);
 
 	// Diviser les destinataires par virgules
-	std::vector<std::string> recipients;
-	size_t start = 0;
-	size_t end = recipient.find(',');
-	while (end != std::string::npos)
-	{
-		recipients.push_back(recipient.substr(start, end - start));
-		start = end + 1;
-		end = recipient.find(',', start);
-	}
-	recipients.push_back(recipient.substr(start));
+	std::vector<std::string> recipients = ft_split(recipient, ',');
 
 	// Vérifier le nombre maximum de destinataires (limite raisonnable)
 	if (recipients.size() > 10)
@@ -476,10 +475,21 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		std::size_t csize = _clients.size();
 
 		// Vérifier si c'est un canal
-		if (currentTarget[0] == '#' || currentTarget[0] == '&' || currentTarget[0] == '+' || currentTarget[0] == '!')
+		if ((currentTarget[0] == '#' || currentTarget[0] == '&' || currentTarget[0] == '+' || currentTarget[0] == '!') && currentTarget.length() > 1)
 		{
-			// Channels non implémentés pour l'instant
-			cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, currentTarget + " :No such channel"));
+			Channel *chan = getChannel(currentTarget.substr(1));
+			if (chan == NULL)
+			{
+				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
+				continue;
+			}
+			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+			std::size_t lsize = chanList.size();
+			for (std::size_t j = 0; j < lsize; ++j)
+			{
+				if (chanList[j].first != cl)
+					chanList[j].first->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+			}
 			continue;
 		}
 
