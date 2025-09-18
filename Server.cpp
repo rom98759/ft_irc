@@ -253,15 +253,13 @@ bool	Server::initSocketOptions(void)
 		return false;
 	}
 
-	//Configurer mode non bloquant (recv/send)
-	int flags = fcntl(_fd, F_GETFL, 0);
-	if (flags < 0 || fcntl(_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	// Mode non bloquant
+	if (fcntl(_fd, F_SETFL, O_NONBLOCK) < 0)
 	{
 		std::cerr << "Error. Failed to set non-blocking mode: " << strerror(errno) << std::endl;
 		close(_fd);
 		return false;
 	}
-
 	return true;
 }
 
@@ -358,7 +356,7 @@ bool	Server::checkSocketErrors(int activity)
 	// Erreur poll
 	if (activity < 0)
 	{
-		// Signal detecté
+		// Signal detecté pour poll
 		if (errno == EINTR)
 		{
 			std::cout << "Poll interrupted by signal." << std::endl;
@@ -461,8 +459,7 @@ void	Server::handleNewConnection(void)
 	int client_fd = accept(_fd, (struct sockaddr *)&client_addr, &addr_len);
 	if (client_fd < 0)
 	{
-		if (errno != EAGAIN && errno != EWOULDBLOCK)
-			std::cerr << "Error. Accept failed: " << strerror(errno) << std::endl;
+		std::cerr << "Error. Accept failed" << std::endl;
 		return;
 	}
 
@@ -482,10 +479,9 @@ void	Server::handleNewConnection(void)
 bool	Server::configureClientSocket(int client_fd)
 {
 	// Mode non bloquant client
-	int flags = fcntl(client_fd, F_GETFL, 0);
-	if (flags < 0 || fcntl(client_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	if (fcntl(client_fd, F_SETFL, O_NONBLOCK) < 0)
 	{
-		std::cerr << "Error. Failed to set client socket non-blocking: " << strerror(errno) << std::endl;
+		std::cerr << "Error. Failed to set client socket non-blocking" << std::endl;
 		close(client_fd);
 		return false;
 	}

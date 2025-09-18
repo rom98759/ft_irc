@@ -15,7 +15,6 @@
 // Inclusions système supplémentaires nécessaires pour l'implémentation
 #include <sys/socket.h>  // Pour recv, send
 #include <cstring>       // Pour memset, strerror
-#include <errno.h>       // Pour errno
 
 const ErrorFdException	Client::EFE;
 
@@ -89,13 +88,8 @@ bool Client::readFromSocket(void)
 	else
 	{
 		// Erreur lecture
-		if (errno != EAGAIN && errno != EWOULDBLOCK)
-		{
-			std::cerr << "Erreur lors de la lecture du client fd=" << _fd << ": ";
-			std::cerr << strerror(errno) << std::endl;
-			return false;
-		}
-		return true;
+		std::cerr << "Erreur de lecture du client fd=" << _fd << std::endl;
+		return false;
 	}
 }
 
@@ -111,8 +105,7 @@ bool Client::sendMessage(const std::string &message)
 	// Erreur d'envoi
 	if (bytesSent < 0)
 	{
-		std::cerr << "Erreur lors de l'envoi au client fd=" << _fd << ": ";
-		std::cerr << strerror(errno) << std::endl;
+		std::cerr << "Erreur lors de l'envoi au client fd=" << _fd << std::endl;
 		return false;
 	}
 	else if (static_cast<size_t>(bytesSent) < message.length())

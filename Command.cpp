@@ -163,7 +163,7 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
 	{
-		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 42o"));
+		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 9 characters"));
 		return (1);
 	}
 
@@ -585,7 +585,32 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
 				continue;
 			}
-			chan->mall(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
+
+			// Vérifier si le client est membre du canal
+			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+			std::size_t lsize = chanList.size();
+			bool isInChannel = false;
+			for (std::size_t j = 0; j < lsize; ++j)
+			{
+				if (chanList[j].first == cl)
+				{
+					isInChannel = true;
+					break;
+				}
+			}
+
+			if (!isInChannel)
+			{
+				cl->sendMessage(formatError(ERR_CANNOTSENDTOCHAN, target, currentTarget + " :Cannot send to channel"));
+				continue;
+			}
+
+			// Envoyer le message à tous les membres du canal sauf l'expéditeur
+			for (std::size_t j = 0; j < lsize; ++j)
+			{
+				if (chanList[j].first != cl)
+					chanList[j].first->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+			}
 			continue;
 		}
 
