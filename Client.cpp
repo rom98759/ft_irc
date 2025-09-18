@@ -131,3 +131,12 @@ char	Client::cannotJoinNChannels(int n) const
 			break ;
 	return (n > (CHPERCL - i));
 }
+
+std::string	Client::getSheet(void) const
+{
+	return ((std::string)"+--- USER INFO ---+\n| ["
+		+ getNick() + "] \n"
+		+ "|\t- Real Name : " + getRealname() + "\n"
+		+ "|\t- Username : " + getUsername() + "\n"
+		+ "+--- USER INFO ---+\n");
+}

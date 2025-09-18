@@ -14,21 +14,51 @@
 #include "Client.hpp"
 
 /*
+ * - La taille du pseudonyme ne doit pas excéder 42 caractères.
  * - Le pseudonyme ne doit pas être vide.
- * - La longueur maximale du pseudonyme est de 9 caractères.
- * - Le premier caractère doit être une lettre ou un caractère spécial autorisé.
- * - Les caractères restants doivent être alphanumériques ou des caractères spéciaux autorisés.
+ * - Les caractères doivent être alphanumériques ou des caractères spéciaux autorisés.
 */
 static char	ft_isValidNick(const std::string &nick)
 {
-	static const char *const	spec = {"[]{}\\|"};
+	static const char *const	spec = "[]{}\\|-_";
 
 	std::size_t	nsize = nick.size();
 	for (std::size_t i = 0; i < nsize; ++i)
 		if (!std::isalnum(nick.at(i))
 			&& ((std::string)spec).find(nick.at(i)) == std::string::npos)
 			return (0);
-	return (1);
+	return (!!nsize && nsize <= 42);
+}
+
+/*
+ * - La taille du nom ne doit pas excéder 747 caractères (taille du nom le plus long au monde (peut changer))
+ * - Le nom ne doit pas être vide.
+ * - Les caractères doivent être alphabétiques.
+*/
+static char	ft_isValidRealname(const std::string &realname)
+{
+	std::size_t	rsize = realname.size();
+	for (std::size_t i = 0; i < rsize; ++i)
+		if (!std::isalpha(realname.at(i)))
+			return (0);
+	return (!!rsize && rsize <= 747);
+}
+
+/*
+ * - La taille du nom de canal ne doit pas excéder 42 caractères.
+ * - Un nom de canal doit commencer par '#'.
+ * - Les caractères doivent être alphanumériques ou '-'.
+*/
+static char	ft_isValidChannelMask(const std::string &channelMask)
+{
+	std::size_t	csize = channelMask.size();
+
+	if (!csize || channelMask.at(0) != '#')
+		return (0);
+	for (std::size_t i = 1; i < csize; ++i)
+		if (!std::isalnum(channelMask.at(i)) && channelMask.at(i) != '-')
+			return (0);
+	return (csize > 1 && csize <= 42);
 }
 
 static std::string levelToString(unsigned char level)
@@ -61,6 +91,15 @@ static const std::vector<std::string>	ft_split(const std::string &str, const cha
 	}
 	recipients.push_back(str.substr(start));
 	return (recipients);
+}
+
+static inline void	welcome(Client *const cl)
+{
+	const std::string	&nick = cl->getNick();
+
+	cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
+	cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
+	cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
 }
 
 /* **************************** |EVENTS/COMMANDS| **************************** */
@@ -119,7 +158,7 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
 	{
-		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|\" are considered valid."));
+		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 42o"));
 		return (1);
 	}
 
@@ -150,12 +189,7 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 		cl->sendMessage(formatMessage("NICK", nick, nick));
 
 		if (cl->isRegistered())
-		{
-			// messages bienvenue IRC
-			cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
-			cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
-			cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
-		}
+			welcome(cl);
 		else
 			cl->sendMessage(formatMessage("NOTICE", nick, "Please complete registration with USER command."));
 	}
@@ -195,22 +229,65 @@ char	Server::user(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// USER <username> <hostname> <servername> :<realname>
-	cl->setUsername(tokens.at(1));
-	cl->setRealname(tokens.at(4));
+	if (!ft_isValidNick(tokens[1]))
+	{
+		cl->sendMessage(formatError("INVALID USERNAME", target, "Erroneous username. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 42o"));
+		cl->sendMessage(formatMessage("INVALID USERNAME", target, "USER :Default username \"guest\" used instead"));
+		cl->setUsername("guest");
+	}
+	else
+		cl->setUsername(tokens[1]);
+
+	if (!ft_isValidRealname(tokens[4]))
+	{
+		cl->sendMessage(formatError("INVALID REALNAME", target, "Erroneous realname. Only alphabetic ASCII characters and spaces are considered valid. Real names can't be empty or exceed 747o"));
+		cl->sendMessage(formatMessage("INVALID REALNAME", target, "USER :Default realname \"Guest Person\" used instead"));
+		cl->setRealname("Guest Person");
+	}
+	else
+		cl->setRealname(tokens[4]);
 
 	cl->upRegisterLevel();
 	if (cl->isRegistered())
-	{
-		// Envoyer les messages de bienvenue standard IRC
-		std::string nick = cl->getNick();
-		cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
-		cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
-		cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
-	}
+		welcome(cl);
 	else
 		cl->sendMessage(formatMessage("NOTICE", target, "USER command received. Please complete registration with NICK command."));
 
+	return (1);
+}
+
+char	Server::whois(Client *const cl, const std::vector<std::string> &tokens)
+{
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered"));
+		return (1);
+	}
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, cl->getNick(), "WHOIS :Not enough parameters"));
+		return (1);
+	}
+	if (tokens.size() != 2)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, cl->getNick(), "WHOIS :Too many parameters"));
+		return (1);
+	}
+
+	if (tokens[1].empty())
+	{
+		cl->sendMessage(formatError(ERR_NONICKNAMEGIVEN, cl->getNick(), "WHOIS :No nickname given"));
+		return (1);
+	}
+
+	Client *const	target = getClient(tokens[1]);
+
+	if (!target)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHNICK, tokens[1], "WHOIS :No such nickname"));
+		return (1);
+	}
+	cl->sendMessage(formatMessage("USER FOUND", cl->getNick(), "\n" + target->getSheet()));
 	return (1);
 }
 
@@ -302,11 +379,9 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 	ksize = keys.size();
 	for (std::size_t i = 0; i < csize; ++i)
 	{
-		// TODO: Verify if it is a channel (# as first character) (We maybe won't handle local channels = no &).
-		// TODO: Verify valid name overall (No ' ', no '^G', no ',').
-		if (chans[i].empty())
+		if (chans[i].empty() || !ft_isValidChannelMask(chans[i]))
 		{
-			cl->sendMessage(formatError(ERR_BADCHANMASK, chans[i], "JOIN :Bad channel mask"));
+			cl->sendMessage(formatError(ERR_BADCHANMASK, chans[i], "JOIN :Bad channel mask. Channel masks need to start with '#', needs to contain at least two characters : except for the first one, they need to be alphabetic or '-'. They can't exceed 42o"));
 			continue ;
 		}
 		Channel	*targetChan = getChannel(chans[i]);
@@ -334,7 +409,6 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		*targetChan += cl;
 		// TODO: Send other steps of Welcome : TOPIC (if it has) | The list of every user bound to the channel.
 		cl->sendMessage(formatMessage("Joined", targetChan->getName(), "JOIN :Channel successfully joined"));
-		// TODO: Tell everyone in the channel cl joined.
 	}
 	return (1);
 }
@@ -346,12 +420,14 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered"));
 		return (1);
 	}
-	if (tokens.size() < 2)
+
+	std::size_t	tsize = tokens.size();
+	if (tsize < 2)
 	{
 		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, cl->getNick(), "PART :Not enough parameters"));
 		return (1);
 	}
-	if (tokens.size() > 3)
+	if (tsize > 3)
 	{
 		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, cl->getNick(), "PART :Too many parameters"));
 		return (1);
@@ -369,9 +445,9 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		if (*cl -= targetChan)
 		{
+			cl->reason = (tsize > 2 ? tokens[2] : "");
 			*targetChan -= cl;
 			cl->sendMessage(formatMessage(cl->getNick(), chans[i], "PART :Left"));
-			// TODO: Send to all cl has quit the channel with reason if it has.
 		}
 		else
 		{
@@ -475,21 +551,15 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		std::size_t csize = _clients.size();
 
 		// Vérifier si c'est un canal
-		if ((currentTarget[0] == '#' || currentTarget[0] == '&' || currentTarget[0] == '+' || currentTarget[0] == '!') && currentTarget.length() > 1)
+		if (currentTarget[0] == '#' && currentTarget.length() > 1)
 		{
-			Channel *chan = getChannel(currentTarget.substr(1));
+			Channel *chan = getChannel(currentTarget);
 			if (chan == NULL)
 			{
 				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
 				continue;
 			}
-			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
-			std::size_t lsize = chanList.size();
-			for (std::size_t j = 0; j < lsize; ++j)
-			{
-				if (chanList[j].first != cl)
-					chanList[j].first->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
-			}
+			chan->mall(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
 			continue;
 		}
 

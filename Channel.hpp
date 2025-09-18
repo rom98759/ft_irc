@@ -32,6 +32,7 @@ class	Channel
 	public:
 		Channel(const std::string &name, const std::string &key);
 		Channel(void) {};
+		void				mall(const std::string &message, Client *except = NULL) const;
 	public: /* -Getters- */
 		const std::string	getName(void) const { return (_name); };
 		const int			&getClientsLimit(void) const { return (_clientsLimit); };

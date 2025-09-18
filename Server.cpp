@@ -146,6 +146,18 @@ Channel	*Server::getChannel(const std::string &name) const
 /* **************************** |Channel Related| **************************** */
 
 
+Client	*Server::getClient(const std::string &nick) const
+{
+	std::size_t	csize = _clients.size();
+	for (std::size_t i = 0; i < csize; ++i)
+	{
+		Client *const	current = _clients[i];
+		if (current->getNick() == nick && current->isRegistered())
+			return (current);
+	}
+	return (NULL);
+}
+
 
 /* ****************************** |Server Init| ****************************** */
 void	Server::initEvents(void)
@@ -153,6 +165,7 @@ void	Server::initEvents(void)
 	addEvent("PASS", &Server::pass);
 	addEvent("NICK", &Server::nick);
 	addEvent("USER", &Server::user);
+	addEvent("WHOIS", &Server::whois);
 	addEvent("PING", &Server::ping);
 	addEvent("JOIN", &Server::join);
 	addEvent("PART", &Server::part);
@@ -191,14 +204,14 @@ bool	Server::initServer(void)
 
 
 // Fonction utilitaire pour formater les messages de réponse selon RFC
-std::string Server::formatMessage(const std::string &code, const std::string &target, const std::string &message) const
+inline std::string formatMessage(const std::string &code, const std::string &target, const std::string &message)
 {
 	std::string source = ":" + std::string("irc.server.com"); // Nom de votre serveur
 	return (source + " " + code + " " + target + " :" + message + "\r\n");
 }
 
 // Fonction utilitaire pour formater les messages d'erreur selon RFC
-std::string Server::formatError(const std::string &code, const std::string &target, const std::string &message) const
+inline std::string formatError(const std::string &code, const std::string &target, const std::string &message)
 {
 	return formatMessage(code, target, message);
 }
@@ -589,16 +602,11 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 	// Envoyer le message de déconnexion AVANT de supprimer le client
 	if (isRegistered)
 	{
+		client->reason = reason;
 		Channel	**const chans = client->getChannels();
 		for (int i = 0; i < CHPERCL; ++i)
-		{
 			if (*(chans + i) != NULL)
-			{
-				// TODO: Notify clients on channel
 				**(chans + i) -= client;
-			}
-		}
-		mall(":" + nickname + " QUIT :Quit: " + reason + "\r\n");
 	}
 
 	// Supprimer le client à la fin

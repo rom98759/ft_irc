@@ -68,19 +68,43 @@ class	Server
 		void							handleClientError(size_t pollfdIndex);
 		void							initEvents(void);
 		void							mall(const std::string &msg) const;
-		std::string						formatMessage(const std::string &code, const std::string &target, const std::string &message) const;
-		std::string						formatError(const std::string &code, const std::string &target, const std::string &message) const;
+
+		// Gestion des clients
+		void							handleNewConnection(void);
+		bool							configureClientSocket(int client_fd);
+		Client*							createClient(int client_fd, struct sockaddr_in &client_addr);
+		int								handleClientMessage(Client *client);
+		void							disconnectClient(Client *client, const std::string &reason);
+
+		// Gestion des cannaux
+		char							createChannel(const std::string &name, const std::string &key);
+		Channel							*getChannel(const std::string &name) const;
+
+		Client							*getClient(const std::string &nick) const;
+
+		// Gestion des signaux
+		static void						signalHandler(int sig);
+
+		// Méthodes d'initialisation
+		bool							initSocketOptions(void);
+		bool							bindAndListen(void);
 	private: /* -Events/Commands- */
 		void							addEvent(const std::string &cmd, char (Server::*f)(Client *const, const std::vector<std::string> &tokens));
 		char							pass(Client *const, const std::vector<std::string> &tokens);
 		char							nick(Client *const, const std::vector<std::string> &tokens);
 		char							user(Client *const, const std::vector<std::string> &tokens);
+		char							whois(Client *const, const std::vector<std::string> &tokens);
 		char							ping(Client *const, const std::vector<std::string> &tokens);
 		char							quit(Client *const, const std::vector<std::string> &tokens);
 		char							join(Client *const, const std::vector<std::string> &tokens);
 		char							part(Client *const, const std::vector<std::string> &tokens);
 		char							debug(Client *const, const std::vector<std::string> &tokens);
 		char							privmsg(Client *const cl, const std::vector<std::string> &tokens);
+	private: /* -Operators- */
+		Server							&operator+=(Client *const cl);
+		Server							&operator-=(Client *const cl);
+		Server							&operator+=(Channel *const ch);
+		Server							&operator-=(Channel *const ch);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
@@ -94,35 +118,15 @@ class	Server
 		static const bool				&isRunning(void) { return (_running); };
 		const std::vector<Channel *>	&getChannels(void) const { return (_channels); };
 	public: /* -Methods- */
-		Server							&operator+=(Client *const cl);
-		Server							&operator-=(Client *const cl);
-		Server							&operator+=(Channel *const ch);
-		Server							&operator-=(Channel *const ch);
 
-		// Méthodes d'initialisation
+		// Méthodes principales
 		bool							initServer(void);
-		bool							initSocketOptions(void);
-		bool							bindAndListen(void);
-
-		// Méthode principale
 		void							run(void);
-
-		// Gestion des clients
-		void							handleNewConnection(void);
-		bool							configureClientSocket(int client_fd);
-		Client*							createClient(int client_fd, struct sockaddr_in &client_addr);
-		int								handleClientMessage(Client *client);
-		void							disconnectClient(Client *client, const std::string &reason);
-
-		// Gestion des cannaux
-		char							createChannel(const std::string &name, const std::string &key);
-		Channel							*getChannel(const std::string &name) const;
-
-		// Gestion des signaux
-		static void						signalHandler(int sig);
 
 		// Setter de l'instance
 		static void						setInstance(Server* srv) { _instance = srv; }
 };
 
 const std::vector<std::string>	parseIrcMessage(const std::string &message);
+std::string 					formatMessage(const std::string &code, const std::string &target, const std::string &message);
+std::string						formatError(const std::string &code, const std::string &target, const std::string &message);
