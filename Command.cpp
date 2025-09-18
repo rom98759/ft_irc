@@ -98,8 +98,8 @@ static inline void	welcome(Client *const cl)
 	const std::string	&nick = cl->getNick();
 
 	cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
-	cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is unicorn.42.network, running version 1.0"));
-	cl->sendMessage(formatMessage(RPL_MYINFO, nick, "unicorn.42.network 1.0 o o"));
+	cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is 127.0.0.1, running version 1.0"));
+	cl->sendMessage(formatMessage(RPL_MYINFO, nick, "127.0.0.1 1.0 o o"));
 }
 
 /* **************************** |EVENTS/COMMANDS| **************************** */
@@ -154,6 +154,11 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	std::string nick = tokens.at(1);
+	if (nick.length() > 9)
+	{
+		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick(), nick + " :Nickname too long (max 9 characters)"));
+		return (1);
+	}
 
 	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
@@ -314,7 +319,7 @@ char	Server::ping(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	// PING -> PONG
-	cl->sendMessage(formatMessage("PONG", "irc.server.com", tokens.at(1)));
+	cl->sendMessage(formatMessage("PONG", "127.0.0.1", tokens.at(1)));
 	return (1);
 }
 
@@ -338,9 +343,9 @@ char	Server::quit(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	std::string quitMessage = tokens.empty() ? cl->getNick() : tokens.at(1);
-
-	cl->sendMessage(formatMessage("QUIT", cl->getNick(), "Quit: " + quitMessage));
+	std::string quitMessage = tokens.empty() ? target : tokens.at(1);
+	std::string quitMsg = ":" + target + "!" + cl->getUsername() + "@127.0.0.1 QUIT :Quit: " + quitMessage + "\r\n";
+	mall(quitMsg);
 	disconnectClient(cl, quitMessage);
 
 	return (1);
@@ -348,19 +353,21 @@ char	Server::quit(Client *const cl, const std::vector<std::string> &tokens)
 
 char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 {
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
 	if (!cl->isRegistered())
 	{
-		cl->sendMessage(formatError(ERR_NOTREGISTERED, "*", "You have not registered"));
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
 		return (1);
 	}
 	if (tokens.size() < 2)
 	{
-		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, cl->getNick(), "JOIN :Not enough parameters"));
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "JOIN :Not enough parameters"));
 		return (1);
 	}
 	if (tokens.size() > 3)
 	{
-		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, cl->getNick(), "JOIN :Too many parameters"));
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "JOIN :Too many parameters"));
 		return (1);
 	}
 	std::vector<std::string>	chans = ft_split(tokens[1], ',');
@@ -368,7 +375,7 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 	// TODO: Determine wether we handle (and how) empty strings or not
 	if (cl->cannotJoinNChannels(csize))
 	{
-		cl->sendMessage(formatError(ERR_TOOMANYCHANNELS, cl->getNick(), "JOIN :You plan to join too many channels"));
+		cl->sendMessage(formatError(ERR_TOOMANYCHANNELS, target, "JOIN :You plan to join too many channels"));
 		return (1);
 	}
 
@@ -407,8 +414,26 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 			continue ;
 		}
 		*targetChan += cl;
-		// TODO: Send other steps of Welcome : TOPIC (if it has) | The list of every user bound to the channel.
-		cl->sendMessage(formatMessage("Joined", targetChan->getName(), "JOIN :Channel successfully joined"));
+
+		// Format RFC pour JOIN
+		std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 JOIN :" + targetChan->getName() + "\r\n";
+		targetChan->mall(joinMsg);
+
+		// Topic (332)
+		cl->sendMessage(formatMessage("332", cl->getNick(), targetChan->getName() + " :Welcome to " + targetChan->getName()));
+
+		// Liste des utilisateurs (353)
+		std::string userList = "";
+		const std::vector<std::pair<Client*, std::string> >& members = targetChan->getList();
+		for (std::vector<std::pair<Client*, std::string> >::const_iterator it = members.begin();
+			it != members.end(); ++it) {
+			if (it != members.begin()) userList += " ";
+			userList += it->first->getNick();
+		}
+		cl->sendMessage(formatMessage("353", cl->getNick(), "= " + targetChan->getName() + " :" + userList));
+
+		// Fin de la liste (366)
+		cl->sendMessage(formatMessage("366", cl->getNick(), targetChan->getName() + " :End of /NAMES list"));
 	}
 	return (1);
 }
@@ -447,7 +472,8 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		{
 			cl->reason = (tsize > 2 ? tokens[2] : "");
 			*targetChan -= cl;
-			cl->sendMessage(formatMessage(cl->getNick(), chans[i], "PART :Left"));
+			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + cl->reason + "\r\n";
+			targetChan->mall(partMsg);
 		}
 		else
 		{
@@ -559,7 +585,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
 				continue;
 			}
-			chan->mall(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+			chan->mall(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
 			continue;
 		}
 
@@ -569,7 +595,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 			if (_clients[j]->getNick() == currentTarget)
 			{
 				// Envoyer le message à l'utilisateur trouvé
-				_clients[j]->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+				_clients[j]->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
 				found = true;
 				break;
 			}

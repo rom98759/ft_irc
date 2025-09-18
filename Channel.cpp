@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: kzhen-cl <marvin@d42.fr>                   +#+  +:+       +#+        */
+/*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/15 15:44:06 by kzhen-cl         ###   ########.fr       */
+/*   Updated: 2025/09/18 19:30:42 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,8 @@ Channel	&Channel::operator+=(Client *const cl)
 		_list.push_back(std::pair<Client *, std::string>(cl, "~+"));
 	else
 		_list.push_back(std::pair<Client *, std::string>(cl, "+"));
-	mall(formatMessage("NEWCOMER", _name, cl->getNick() + " joined."), cl);
+	std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 JOIN :" + _name + "\r\n";
+	mall(joinMsg, cl);
 	return (*this);
 }
 
@@ -40,7 +41,11 @@ Channel	&Channel::operator-=(Client *const cl)
 		if (_list[i].first == cl)
 		{
 			_list.erase(_list.begin() + i);
-			mall(formatMessage("DEPARTURE", _name, cl->getNick() + " left." + (cl->reason.empty() ? "" : (" (" + cl->reason + ")"))));
+			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + _name;
+			if (!cl->reason.empty())
+				partMsg += " :" + cl->reason;
+			partMsg += "\r\n";
+			mall(partMsg);
 			break ;
 		}
 	}

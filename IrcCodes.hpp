@@ -64,6 +64,15 @@
 #define ERR_PASSWDMISMATCH    "464" // Mot de passe incorrect
 #define ERR_CHANNELISFULL     "471" // Canal plein
 #define ERR_UNKNOWNMODE       "472" // Mode inconnu
+#define ERR_INVITEONLYCHAN   "473" // Canal en invitation uniquement
+#define ERR_BANNEDFROMCHAN   "474" // Banni du canal
+#define ERR_BADCHANNELKEY    "475" // Mauvaise clé de canal
+#define ERR_BADCHANMASK      "476" // Mauvais masque de canal
+#define ERR_NOCHANMODES      "477" // Canal n'a pas de modes
+#define ERR_NOPRIVILEGES     "481" // Permission refusée
+#define ERR_CHANOPRIVSNEEDED "482" // Vous n'êtes pas opérateur
+#define ERR_UMODEUNKNOWNFLAG "501" // Mode utilisateur inconnu
+#define ERR_USERSDONTMATCH   "502" // Impossible de voir/modifier mode d'autres utilisateurs
 #define ERR_INVITEONLYCHAN    "473" // Canal en invitation uniquement
 #define ERR_BANNEDFROMCHAN    "474" // Banni du canal
 #define ERR_BADCHANNELKEY     "475" // Mauvaise clé de canal

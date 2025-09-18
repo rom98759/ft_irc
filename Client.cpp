@@ -61,11 +61,17 @@ char	Client::operator-=(Channel *const ch)
 
 bool Client::readFromSocket(void)
 {
-	char buffer[1024];
+	char buffer[512];  // RFC 1459: Max 512 octets incluant CR-LF
 	ssize_t bytesRead;
 
+	if (_buffer.length() > 512)
+	{
+		std::cerr << "Buffer overflow attempt from client " << _fd << std::endl;
+		return false;
+	}
+
 	memset(buffer, 0, sizeof(buffer));
-	bytesRead = recv(_fd, buffer, sizeof(buffer) - 1, 0);
+	bytesRead = recv(_fd, buffer, sizeof(buffer) - 2, 0);  // -2 pour CR-LF
 
 	// Lu
 	if (bytesRead > 0)

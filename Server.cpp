@@ -97,6 +97,7 @@ Server	&Server::operator-=(Channel *const ch)
 const std::vector<std::string> parseIrcMessage(const std::string &message)
 {
 	std::vector<std::string> params;
+	const size_t MAX_PARAMS = 15; // RFC 1459: Maximum 15 paramètres
 
 	params.clear();
 
@@ -105,11 +106,15 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 	if (start == std::string::npos)
 		return params; // Que des espaces
 
+	// Vérifier que le message ne commence pas par un espace ou ':'
+	if (message[start] == ':')
+		return params; // Message invalide selon RFC
+
 	// Découper en paramètres
 	std::istringstream iss(message.substr(start));
 	std::string token;
 
-	while (iss >> token)
+	while (iss >> token && params.size() < MAX_PARAMS)
 	{
 		// Si on trouve un paramètre commençant par ':', prendre tout le reste
 		if (token[0] == ':')
@@ -122,6 +127,17 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 		else
 		{
 			params.push_back(token);
+		}
+	}
+
+	// Si on a atteint la limite de paramètres et qu'il reste du texte
+	if (params.size() >= MAX_PARAMS)
+	{
+		std::string remaining;
+		if (std::getline(iss, remaining) && !remaining.empty())
+		{
+			// Tronquer et ajouter un indicateur
+			params.push_back("ERR_TOOMANYPARAMS");
 		}
 	}
 
@@ -206,7 +222,7 @@ bool	Server::initServer(void)
 // Fonction utilitaire pour formater les messages de réponse selon RFC
 inline std::string formatMessage(const std::string &code, const std::string &target, const std::string &message)
 {
-	std::string source = ":" + std::string("irc.server.com"); // Nom de votre serveur
+	std::string source = ":" + std::string("127.0.0.1"); // Nom de votre serveur
 	return (source + " " + code + " " + target + " :" + message + "\r\n");
 }
 
