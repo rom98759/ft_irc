@@ -483,8 +483,27 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
 				continue;
 			}
+
+			// Vérifier si le client est membre du canal
 			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
 			std::size_t lsize = chanList.size();
+			bool isInChannel = false;
+			for (std::size_t j = 0; j < lsize; ++j)
+			{
+				if (chanList[j].first == cl)
+				{
+					isInChannel = true;
+					break;
+				}
+			}
+
+			if (!isInChannel)
+			{
+				cl->sendMessage(formatError(ERR_CANNOTSENDTOCHAN, target, currentTarget + " :Cannot send to channel"));
+				continue;
+			}
+
+			// Envoyer le message à tous les membres du canal sauf l'expéditeur
 			for (std::size_t j = 0; j < lsize; ++j)
 			{
 				if (chanList[j].first != cl)
