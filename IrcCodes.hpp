@@ -41,9 +41,16 @@
 
 // Erreurs (400-599)
 #define ERR_NOSUCHNICK        "401" // Pseudo/canal inexistant
+#define ERR_NOSUCHSERVER      "402" // Serveur inexistant
 #define ERR_NOSUCHCHANNEL     "403" // Canal inexistant
 #define ERR_CANNOTSENDTOCHAN  "404" // Impossible d'envoyer au canal
 #define ERR_TOOMANYCHANNELS   "405" // Limite de canaux connectés atteinte
+#define ERR_TOOMANYTARGETS    "407" // Trop de destinataires
+#define ERR_NORECIPIENT       "411" // Aucun destinataire spécifié
+#define ERR_NOTEXTTOSEND      "412" // Aucun texte à envoyer
+#define ERR_NOTOPLEVEL        "413" // Pas de domaine de premier niveau
+#define ERR_WILDTOPLEVEL      "414" // Caractère générique de domaine de premier niveau
+#define ERR_INPUTTOOLONG      "417" // Entrée trop longue
 #define ERR_UNKNOWNCOMMAND    "421" // Commande inconnue
 #define ERR_NOMOTD            "422" // MOTD manquant
 #define ERR_NONICKNAMEGIVEN   "431" // Aucun pseudo fourni

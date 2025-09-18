@@ -80,6 +80,7 @@ class	Server
 		char							join(Client *const, const std::vector<std::string> &tokens);
 		char							part(Client *const, const std::vector<std::string> &tokens);
 		char							debug(Client *const, const std::vector<std::string> &tokens);
+		char							privmsg(Client *const cl, const std::vector<std::string> &tokens);
 
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);

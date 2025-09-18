@@ -405,3 +405,102 @@ char	Server::debug(Client *const cl, const std::vector<std::string> &tokens)
 	cl->sendMessage(status);
 	return (1);
 }
+
+char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		cl->sendMessage(formatMessage("NOTICE", target, "Current registration level: " + levelToString(cl->getRegisterLevel()) + " (needs to be 3)"));
+		return (1);
+	}
+
+	// Vérifier si un destinataire est spécifié
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NORECIPIENT, target, "No recipient given (PRIVMSG)"));
+		return (1);
+	}
+
+	// Vérifier si un message est spécifié
+	if (tokens.size() < 3)
+	{
+		cl->sendMessage(formatError(ERR_NOTEXTTOSEND, target, "No text to send"));
+		return (1);
+	}
+
+	if (tokens.size() != 3)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "PRIVMSG :Too many parameters"));
+		return (1);
+	}
+
+	std::string recipient = tokens.at(1);
+	std::string message = tokens.at(2);
+
+	// Diviser les destinataires par virgules
+	std::vector<std::string> recipients;
+	size_t start = 0;
+	size_t end = recipient.find(',');
+	while (end != std::string::npos)
+	{
+		recipients.push_back(recipient.substr(start, end - start));
+		start = end + 1;
+		end = recipient.find(',', start);
+	}
+	recipients.push_back(recipient.substr(start));
+
+	// Vérifier le nombre maximum de destinataires (limite raisonnable)
+	if (recipients.size() > 10)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYTARGETS, target, "Too many targets"));
+		return (1);
+	}
+
+	std::size_t rsize = recipients.size();
+
+	for (std::size_t i = 0; i < rsize; ++i)
+	{
+		std::string currentTarget = recipients[i];
+
+		// Vérifier si le destinataire est vide
+		if (currentTarget.empty())
+		{
+			cl->sendMessage(formatError(ERR_NORECIPIENT, target, "No recipient given (PRIVMSG)"));
+			continue;
+		}
+
+		bool found = false;
+		std::size_t csize = _clients.size();
+
+		// Vérifier si c'est un canal
+		if (currentTarget[0] == '#' || currentTarget[0] == '&' || currentTarget[0] == '+' || currentTarget[0] == '!')
+		{
+			// Channels non implémentés pour l'instant
+			cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, currentTarget + " :No such channel"));
+			continue;
+		}
+
+		// Rechercher l'utilisateur
+		for (std::size_t j = 0; j < csize; ++j)
+		{
+			if (_clients[j]->getNick() == currentTarget)
+			{
+				// Envoyer le message à l'utilisateur trouvé
+				_clients[j]->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+				found = true;
+				break;
+			}
+		}
+
+		// Si aucun utilisateur trouvé
+		if (!found)
+		{
+			cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
+		}
+	}
+
+	return (1);
+}

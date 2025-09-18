@@ -157,6 +157,7 @@ void	Server::initEvents(void)
 	addEvent("JOIN", &Server::join);
 	addEvent("PART", &Server::part);
 	addEvent("DEBUG", &Server::debug);
+	addEvent("PRIVMSG", &Server::privmsg);
 }
 
 bool	Server::initServer(void)
@@ -292,10 +293,10 @@ void	Server::run(void)
 // Static signal handler for SIGINT and SIGQUIT
 void	Server::signalHandler(int signum)
 {
-	std::cout << "\nInterrupt signal (" << signum << ") received.\n";
+	std::cout << "\n🛑 Server shutdown signal (" << signum << ") received." << std::endl;
+	std::cout << "Closing all client connections..." << std::endl;
 	if (_instance)
 		_running = false;
-
 }
 
 // Configurer les structures pollfd pour le serveur et les clients
@@ -392,7 +393,7 @@ void	Server::handleClientInput(size_t pollfdIndex)
 			if (result == 0)
 			{
 				// Client déconnecté brutalement, appeler disconnectClient
-				disconnectClient(_clients[j], "[ERROR] Connection timeout");
+				disconnectClient(_clients[j], "Connection timeout");
 				break;
 			}
 			else if (result == 2)
@@ -414,8 +415,9 @@ void	Server::handleClientError(size_t pollfdIndex)
 	{
 		if (_clients[j]->getFd() == _pollfds[pollfdIndex].fd)
 		{
-			std::cout << "Client déconnecté ou erreur détectée (fd=" << _pollfds[pollfdIndex].fd << ")" << std::endl;
-			disconnectClient(_clients[j], "[ERROR]");
+			std::string nickname = _clients[j]->isRegistered() ? _clients[j]->getNick() : "unregistered";
+			std::cout << "📡 Client '" << nickname << "' disconnected abruptly (fd=" << _pollfds[pollfdIndex].fd << ")" << std::endl;
+			disconnectClient(_clients[j], "Connection lost");
 			break;
 		}
 	}
@@ -534,6 +536,13 @@ int	Server::handleClientMessage(Client *client)
 			client->appendToBuffer(buffer.substr(pos + lineEndSize));
 		}
 
+		if (message.length() > 510) // 512 - 2 (\r\n)
+		{
+			std::cout << "Message trop long du client fd=" << client->getFd() << " (" << message.length() << " octets), tronqué" << std::endl;
+			message = message.substr(0, 510);
+			client->sendMessage(formatError(ERR_INPUTTOOLONG, client->getNick().empty() ? "*" : client->getNick(), "Message trop long, tronqué à 510 caractères"));
+		}
+
 		std::cout << "Message complet reçu du client fd=" << client->getFd() << ": [" << message << "]" << std::endl;
 
 		// Découper le message en tokens pour identifier la commande
@@ -589,7 +598,7 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 				**(chans + i) -= client;
 			}
 		}
-		mall(formatMessage("QUIT", nickname, "Quit: " + reason));
+		mall(":" + nickname + " QUIT :Quit: " + reason + "\r\n");
 	}
 
 	// Supprimer le client à la fin
