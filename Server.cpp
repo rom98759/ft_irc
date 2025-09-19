@@ -622,20 +622,8 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 		client->reason = reason;
 		Channel	**const chans = client->getChannels();
 		for (int i = 0; i < CHPERCL; ++i)
-		{
 			if (*(chans + i) != NULL)
-			{
-				Channel *chan = *(chans + i);
-				*chan -= client;
-
-				// Si le canal devient vide, le supprimer du serveur
-				if (chan->getList().empty())
-				{
-					*this -= chan;
-					delete chan;
-				}
-			}
-		}
+				**(chans + i) -= client;
 	}
 
 	// Supprimer le client à la fin

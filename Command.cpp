@@ -474,13 +474,6 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 			*targetChan -= cl;
 			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + cl->reason + "\r\n";
 			targetChan->mall(partMsg);
-
-			// Si le canal devient vide, le supprimer du serveur
-			if (targetChan->getList().empty())
-			{
-				*this -= targetChan;
-				delete targetChan;
-			}
 		}
 		else
 		{
@@ -927,13 +920,6 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 	// Retirer l'utilisateur du canal
 	*kickUser -= chan;
 	*chan -= kickUser;
-
-	// Si le canal devient vide, le supprimer du serveur
-	if (chan->getList().empty())
-	{
-		*this -= chan;
-		delete chan;
-	}
 
 	return (1);
 }
