@@ -624,6 +624,7 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 		for (int i = 0; i < CHPERCL; ++i)
 			if (*(chans + i) != NULL)
 				**(chans + i) -= client;
+		mall(":" + nickname + " QUIT :Quit: " + reason + "\r\n");
 	}
 
 	// Supprimer le client à la fin
