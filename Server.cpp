@@ -187,6 +187,10 @@ void	Server::initEvents(void)
 	addEvent("PART", &Server::part);
 	addEvent("DEBUG", &Server::debug);
 	addEvent("PRIVMSG", &Server::privmsg);
+	addEvent("TOPIC", &Server::topic);
+	addEvent("MODE", &Server::mode);
+	addEvent("KICK", &Server::kick);
+	addEvent("WHO", &Server::who);
 }
 
 bool	Server::initServer(void)
@@ -419,16 +423,16 @@ void	Server::handleClientInput(size_t pollfdIndex)
 
 			if (result == 0)
 			{
-				// Client déconnecté brutalement, appeler disconnectClient
+				// Client déconnecté brutalement => disconnectClient
 				disconnectClient(_clients[j], "Connection timeout");
 				break;
 			}
 			else if (result == 2)
 			{
-				// Client déjà déconnecté via QUIT, ne rien faire de plus
+				// Client déconnecté QUIT
 				break;
 			}
-			// Si result == 1, tout va bien, continuer
+			// result == 1 OK
 		}
 	}
 }

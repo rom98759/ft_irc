@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Channel.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: kzhen-cl <marvin@d42.fr>                   +#+  +:+       +#+        */
+/*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 13:27:45 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/15 13:27:45 by kzhen-cl         ###   ########.fr       */
+/*   Updated: 2025/09/19 12:46:40 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,12 @@ class	Channel
 		std::string			_name;
 		std::string			_key;
 		int					_clientsLimit;
+		std::string			_topic;
+		std::string			_modes;			// Modes du canal (+tnlk)
+		bool				_topicRestricted;	// Mode +t
+		bool				_hasUserLimit;		// Mode +l
+		bool				_hasKey;			// Mode +k
+		bool				_inviteOnly;		// Mode +i
 		std::vector<
 			std::pair<
 				Client *,
@@ -37,17 +43,30 @@ class	Channel
 		const std::string	getName(void) const { return (_name); };
 		const int			&getClientsLimit(void) const { return (_clientsLimit); };
 		const std::string	&getKey(void) const { return (_key); };
+		const std::string	&getTopic(void) const { return (_topic); };
+		const std::string	&getModes(void) const { return (_modes); };
+		bool				isTopicRestricted(void) const { return (_topicRestricted); };
+		bool				hasUserLimit(void) const { return (_hasUserLimit); };
+		bool				hasKey(void) const { return (_hasKey); };
+		bool				isInviteOnly(void) const { return (_inviteOnly); };
 		const std::vector<
 			std::pair<
 				Client *,
 				std::string
 			>
 		>					&getList(void) const { return (_list); };
-		char				isFull(void) const { return ((int)_list.size() == _clientsLimit); };
+		char				isFull(void) const { return (_hasUserLimit && (int)_list.size() >= _clientsLimit); };
 	public: /* -Setters- */
 		void				setName(const std::string &newName) { _name = newName; };
 		void				setClientsLimit(const int &i) { _clientsLimit = i; };
-		void				setKey(const std::string &newKey) { _key = newKey; };
+		void				setKey(const std::string &newKey) { _key = newKey; _hasKey = !newKey.empty(); };
+		void				setTopic(const std::string &newTopic) { _topic = newTopic; };
+		void				setTopicRestricted(bool restricted) { _topicRestricted = restricted; };
+		void				setUserLimit(int limit) { _clientsLimit = limit; _hasUserLimit = (limit > 0); };
+		void				setInviteOnly(bool inviteOnly) { _inviteOnly = inviteOnly; };
+	public: /* -Helper Methods- */
+		bool				isUserInChannel(Client *user) const;
+		bool				isUserOperator(Client *user) const;
 	public: /* -Operators- */
 		Channel				&operator+=(Client *const);
 		Channel				&operator-=(Client *const);

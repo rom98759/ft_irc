@@ -29,6 +29,7 @@
 #include <fcntl.h>      // Pour fcntl
 #include <signal.h>     // Pour signal
 #include <errno.h>      // Pour errno
+#include <cstdlib>      // Pour atoi
 
 // Inclusions du projet
 #include "IrcCodes.hpp"
@@ -98,6 +99,10 @@ class	Server
 		char							quit(Client *const, const std::vector<std::string> &tokens);
 		char							join(Client *const, const std::vector<std::string> &tokens);
 		char							part(Client *const, const std::vector<std::string> &tokens);
+		char							topic(Client *const, const std::vector<std::string> &tokens);
+		char							mode(Client *const, const std::vector<std::string> &tokens);
+		char							kick(Client *const, const std::vector<std::string> &tokens);
+		char							who(Client *const, const std::vector<std::string> &tokens);
 		char							debug(Client *const, const std::vector<std::string> &tokens);
 		char							privmsg(Client *const cl, const std::vector<std::string> &tokens);
 	private: /* -Operators- */

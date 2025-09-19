@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/18 19:30:42 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/19 13:05:10 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,12 @@ Channel::Channel(const std::string &name, const std::string &key)
 	_name = name;
 	_key = key;
 	_clientsLimit = 10;
+	_topic = "";
+	_modes = "tl";  // Modes par défaut : +t (topic restricted) et +l (user limit)
+	_inviteOnly = false;
+	_topicRestricted = true;
+	_hasUserLimit = true; // default 10
+	_hasKey = !key.empty();
 }
 
 Channel	&Channel::operator+=(Client *const cl)
@@ -28,8 +34,6 @@ Channel	&Channel::operator+=(Client *const cl)
 		_list.push_back(std::pair<Client *, std::string>(cl, "~+"));
 	else
 		_list.push_back(std::pair<Client *, std::string>(cl, "+"));
-	std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 JOIN :" + _name + "\r\n";
-	mall(joinMsg, cl);
 	return (*this);
 }
 
@@ -41,11 +45,6 @@ Channel	&Channel::operator-=(Client *const cl)
 		if (_list[i].first == cl)
 		{
 			_list.erase(_list.begin() + i);
-			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + _name;
-			if (!cl->reason.empty())
-				partMsg += " :" + cl->reason;
-			partMsg += "\r\n";
-			mall(partMsg);
 			break ;
 		}
 	}
@@ -58,4 +57,24 @@ void	Channel::mall(const std::string &message, Client *except) const
 	for (std::size_t i = 0; i < lsize; ++i)
 		if (_list[i].first != except)
 			_list[i].first->sendMessage(message);
+}
+
+bool Channel::isUserInChannel(Client *user) const
+{
+	for (size_t i = 0; i < _list.size(); ++i)
+	{
+		if (_list[i].first == user)
+			return true;
+	}
+	return false;
+}
+
+bool Channel::isUserOperator(Client *user) const
+{
+	for (size_t i = 0; i < _list.size(); ++i)
+	{
+		if (_list[i].first == user)
+			return (_list[i].second.find('~') != std::string::npos);
+	}
+	return false;
 }

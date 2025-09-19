@@ -31,16 +31,20 @@ static char	ft_isValidNick(const std::string &nick)
 }
 
 /*
- * - La taille du nom ne doit pas excéder 747 caractères (taille du nom le plus long au monde (peut changer))
+ * - La taille du nom ne doit pas excéder 747 caractères
  * - Le nom ne doit pas être vide.
- * - Les caractères doivent être alphabétiques.
+ * - Les caractères peuvent être alphabétiques, espaces, et certains caractères spéciaux.
 */
 static char	ft_isValidRealname(const std::string &realname)
 {
 	std::size_t	rsize = realname.size();
 	for (std::size_t i = 0; i < rsize; ++i)
-		if (!std::isalpha(realname.at(i)))
+	{
+		char c = realname.at(i);
+		// RFC 1459: réel nom peut contenir espaces et caractères imprimables
+		if (!std::isprint(c) && c != ' ')
 			return (0);
+	}
 	return (!!rsize && rsize <= 747);
 }
 
@@ -154,16 +158,11 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	std::string nick = tokens.at(1);
-	if (nick.length() > 9)
-	{
-		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick(), nick + " :Nickname too long (max 9 characters)"));
-		return (1);
-	}
 
 	// Vérifier le pseudo est valide
 	if (!ft_isValidNick(nick))
 	{
-		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 9 characters"));
+		cl->sendMessage(formatError(ERR_ERRONEUSNICKNAME, cl->getNick().empty() ? "*" : cl->getNick(), nick + " :Erroneous nickname. Only alphanumeric ASCII characters and \"[]{}\\|-_\" are considered valid. Nicknames can't be empty or exceed 42 characters"));
 		return (1);
 	}
 
@@ -201,7 +200,7 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	// Si changement de pseudo
 	else if (!isNewNick)
 	{
-		std::string nickChangeMsg = ":" + oldNick + " NICK " + nick + "\r\n";
+		std::string nickChangeMsg = ":" + oldNick + "!" + cl->getUsername() + "@127.0.0.1 NICK :" + nick + "\r\n";
 		mall(nickChangeMsg);
 	}
 
@@ -332,23 +331,14 @@ char	Server::quit(Client *const cl, const std::vector<std::string> &tokens)
 		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
 		return (1);
 	}
-	if (tokens.size() < 2)
-	{
-		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "PING :Not enough parameters"));
-		return (1);
-	}
-	if (tokens.size() != 2)
-	{
-		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "PING :Too many parameters"));
-		return (1);
-	}
 
-	std::string quitMessage = tokens.empty() ? target : tokens.at(1);
-	std::string quitMsg = ":" + target + "!" + cl->getUsername() + "@127.0.0.1 QUIT :Quit: " + quitMessage + "\r\n";
-	mall(quitMsg);
+	std::string quitMessage = "Client Quit";
+	if (tokens.size() >= 2)
+		quitMessage = tokens.at(1);
+
 	disconnectClient(cl, quitMessage);
 
-	return (1);
+	return (2);
 }
 
 char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
@@ -399,13 +389,18 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		else if (targetChan->isFull())
 		{
-			cl->sendMessage(formatError(ERR_CHANNELISFULL, targetChan->getName(), "JOIN :Channel full"));
+			cl->sendMessage(formatError(ERR_CHANNELISFULL, targetChan->getName(), "Cannot join channel (+l)"));
 			continue ;
 		}
 		std::string	key = targetChan->getKey();
 		if (!key.empty() && key != (i < ksize ? keys[i] : ""))
 		{
-			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan->getName(), "JOIN :Bad channel key"));
+			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan->getName(), "Cannot join channel (+k)"));
+			continue ;
+		}
+		if (targetChan->isInviteOnly() && !targetChan->isUserInChannel(cl))
+		{
+			cl->sendMessage(formatError(ERR_INVITEONLYCHAN, targetChan->getName(), "Cannot join channel (+i)"));
 			continue ;
 		}
 		if (!(*cl += targetChan))
@@ -425,9 +420,10 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		// Liste des utilisateurs (353)
 		std::string userList = "";
 		const std::vector<std::pair<Client*, std::string> >& members = targetChan->getList();
-		for (std::vector<std::pair<Client*, std::string> >::const_iterator it = members.begin();
-			it != members.end(); ++it) {
-			if (it != members.begin()) userList += " ";
+		for (std::vector<std::pair<Client*, std::string> >::const_iterator it = members.begin(); it != members.end(); ++it)
+		{
+			if (it != members.begin())
+				userList += " ";
 			userList += it->first->getNick();
 		}
 		cl->sendMessage(formatMessage("353", cl->getNick(), "= " + targetChan->getName() + " :" + userList));
@@ -508,7 +504,7 @@ char	Server::debug(Client *const cl, const std::vector<std::string> &tokens)
 	for (int i = 0; i < CHPERCL; ++i)
 	{
 		if (chans[i] != NULL)
-			status += "  - " + chans[i]->getName() + "\r\n";
+			status += "  - " + chans[i]->getName() + (chans[i]->getKey().empty() ? " (key: NA)" : " (key: " + chans[i]->getKey() + ")") + "\r\n";
 	}
 	status += "----------------------------\r\n";
 
@@ -582,22 +578,14 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 			Channel *chan = getChannel(currentTarget);
 			if (chan == NULL)
 			{
-				cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
+				cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, currentTarget + " :No such channel"));
 				continue;
 			}
 
 			// Vérifier si le client est membre du canal
 			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
 			std::size_t lsize = chanList.size();
-			bool isInChannel = false;
-			for (std::size_t j = 0; j < lsize; ++j)
-			{
-				if (chanList[j].first == cl)
-				{
-					isInChannel = true;
-					break;
-				}
-			}
+			bool isInChannel = chan->isUserInChannel(cl);
 
 			if (!isInChannel)
 			{
@@ -609,7 +597,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 			for (std::size_t j = 0; j < lsize; ++j)
 			{
 				if (chanList[j].first != cl)
-					chanList[j].first->sendMessage(":" + cl->getNick() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
+					chanList[j].first->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
 			}
 			continue;
 		}
@@ -617,7 +605,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		// Rechercher l'utilisateur
 		for (std::size_t j = 0; j < csize; ++j)
 		{
-			if (_clients[j]->getNick() == currentTarget)
+			if (_clients[j]->getNick() == currentTarget && _clients[j]->isRegistered())
 			{
 				// Envoyer le message à l'utilisateur trouvé
 				_clients[j]->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
@@ -629,9 +617,332 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		// Si aucun utilisateur trouvé
 		if (!found)
 		{
-			cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nick/channel"));
+			cl->sendMessage(formatError(ERR_NOSUCHNICK, target, currentTarget + " :No such nickname"));
 		}
 	}
 
+	return (1);
+}
+
+char	Server::topic(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		return (1);
+	}
+
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "TOPIC :Not enough parameters"));
+		return (1);
+	}
+
+	if (tokens.size() > 3)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "TOPIC :Too many parameters"));
+		return (1);
+	}
+
+	std::string channelName = tokens[1];
+	Channel *chan = getChannel(channelName);
+
+	if (!chan)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur est dans le canal
+	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+	bool isInChannel = chan->isUserInChannel(cl);
+
+	if (!isInChannel)
+	{
+		cl->sendMessage(formatError(ERR_NOTONCHANNEL, target, channelName + " :You're not on that channel"));
+		return (1);
+	}
+
+	// Si pas de nouveau topic spécifié, retourner le topic actuel
+	if (tokens.size() == 2)
+	{
+		if (chan->getTopic().empty())
+			cl->sendMessage(formatMessage(RPL_NOTOPIC, target, channelName + " :No topic is set"));
+		else
+			cl->sendMessage(formatMessage(RPL_TOPIC, target, channelName + " :" + chan->getTopic()));
+		return (1);
+	}
+
+	// Vérifier si le mode +t est activé
+	if (chan->isTopicRestricted())
+	{
+		// Vérifier si l'utilisateur est opérateur
+		if (chanList.empty() || chan->isUserOperator(cl) == false)
+		{
+			cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
+			return (1);
+		}
+	}
+
+	// nouveau topic
+	std::string newTopic = tokens[2];
+	chan->setTopic(newTopic);
+
+	// mall topic
+	std::string topicMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 TOPIC " + channelName + " :" + newTopic + "\r\n";
+	chan->mall(topicMsg);
+
+	return (1);
+}
+
+char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		return (1);
+	}
+
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "MODE :Not enough parameters"));
+		return (1);
+	}
+
+	std::string channelName = tokens[1];
+
+	// Canal error
+	if (channelName[0] != '#')
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	Channel *chan = getChannel(channelName);
+	if (!chan)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	// Si pas de mode spécifié, retourner les modes actuels
+	if (tokens.size() == 2)
+	{
+		std::string modeString = "+";
+		if (chan->isInviteOnly()) modeString += "i";
+		if (chan->isTopicRestricted()) modeString += "t";
+		if (chan->hasUserLimit()) modeString += "l";
+		if (chan->hasKey()) modeString += "k";
+
+		cl->sendMessage(formatMessage(RPL_CHANNELMODEIS, target, channelName + " " + modeString));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur est opérateur du canal
+	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+	if (chanList.empty() || chan->isUserOperator(cl) == false)
+	{
+		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
+		return (1);
+	}
+
+	std::string modeStr = tokens[2];
+	bool adding = true;
+	size_t paramIndex = 3;
+
+	for (size_t i = 0; i < modeStr.length(); ++i)
+	{
+		char c = modeStr[i];
+
+		if (c == '+')
+		{
+			adding = true;
+		}
+		else if (c == '-')
+		{
+			adding = false;
+		}
+		else if (c == 'i')
+		{
+			chan->setInviteOnly(adding);
+		}
+		else if (c == 't')
+		{
+			chan->setTopicRestricted(adding);
+		}
+		else if (c == 'l')
+		{
+			if (adding)
+			{
+				if (paramIndex < tokens.size())
+				{
+					int limit = std::atoi(tokens[paramIndex].c_str());
+					if (limit > 0)
+						chan->setUserLimit(limit);
+					paramIndex++;
+				}
+			}
+			else
+			{
+				chan->setUserLimit(0); // Supprimer la limite
+			}
+		}
+		else if (c == 'k')
+		{
+			if (adding)
+			{
+				if (paramIndex < tokens.size())
+				{
+					chan->setKey(tokens[paramIndex]);
+					paramIndex++;
+				}
+			}
+			else
+			{
+				chan->setKey("");
+			}
+		}
+		else
+		{
+			cl->sendMessage(formatError(ERR_UNKNOWNMODE, target, std::string(1, c) + " :is unknown mode char to me"));
+			continue;
+		}
+	}
+
+	// Notifier le changement de mode
+	std::string modeMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 MODE " + channelName + " " + modeStr;
+	if (paramIndex > 3)
+	{
+		for (size_t i = 3; i < paramIndex && i < tokens.size(); ++i)
+			modeMsg += " " + tokens[i];
+	}
+	modeMsg += "\r\n";
+	chan->mall(modeMsg);
+
+	return (1);
+}
+
+char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		return (1);
+	}
+
+	if (tokens.size() < 3)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "KICK :Not enough parameters"));
+		return (1);
+	}
+
+	std::string channelName = tokens[1];
+	std::string kickNick = tokens[2];
+	std::string reason = (tokens.size() > 3) ? tokens[3] : cl->getNick();
+
+	Channel *chan = getChannel(channelName);
+	if (!chan)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur qui kick est opérateur
+	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+	if (chanList.empty() || chan->isUserOperator(cl) == false)
+	{
+		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
+		return (1);
+	}
+
+	// Trouver l'utilisateur à kicker
+	Client *kickUser = getClient(kickNick);
+	if (!kickUser)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHNICK, target, kickNick + " :No such nick/channel"));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur est dans le canal
+	bool isInChannel = chan->isUserInChannel(kickUser);
+
+	if (!isInChannel)
+	{
+		cl->sendMessage(formatError(ERR_NOTONCHANNEL, target, kickNick + " :They aren't on that channel"));
+		return (1);
+	}
+
+	// Effectuer le kick
+	std::string kickMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 KICK " + channelName + " " + kickNick + " :" + reason + "\r\n";
+	chan->mall(kickMsg);
+
+	// Retirer l'utilisateur du canal
+	*kickUser -= chan;
+	*chan -= kickUser;
+
+	return (1);
+}
+
+char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		return (1);
+	}
+
+	if (tokens.size() < 2)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "WHO :Not enough parameters"));
+		return (1);
+	}
+
+	std::string mask = tokens[1];
+
+	// Si c'est un canal
+	if (mask[0] == '#')
+	{
+		Channel *chan = getChannel(mask);
+		if (!chan)
+		{
+			cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, mask + " :No such channel"));
+			cl->sendMessage(formatMessage(RPL_ENDOFWHO, target, mask + " :End of WHO list"));
+			return (1);
+		}
+
+		const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+		for (size_t i = 0; i < chanList.size(); ++i)
+		{
+			Client *user = chanList[i].first;
+			std::string away = "H"; // H = here, G = away (pas implémenté)
+			std::string op = chan->isUserOperator(user) ? "@" : ""; // @ = opérateur, "" = non opérateur
+
+			// Format: RPL_WHOREPLY "<channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <real name>"
+			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
+				mask + " " + user->getUsername() + " 127.0.0.1 " +
+				user->getNick() + " " + away + op + " :0 " + user->getRealname()));
+		}
+	}
+	else
+	{
+		// WHO pour un utilisateur spécifique
+		Client *user = getClient(mask);
+		if (user && user->isRegistered())
+		{
+			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
+				"* " + user->getUsername() + " 127.0.0.1 " +
+				user->getNick() + " H :0 " + user->getRealname()));
+		}
+	}
+
+	cl->sendMessage(formatMessage(RPL_ENDOFWHO, target, mask + " :End of WHO list"));
 	return (1);
 }

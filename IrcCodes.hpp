@@ -38,6 +38,9 @@
 #define RPL_TOPIC             "332" // Sujet du canal
 #define RPL_NAMREPLY          "353" // Liste des utilisateurs d'un canal
 #define RPL_ENDOFNAMES        "366" // Fin de la liste NAMES
+#define RPL_WHOREPLY          "352" // Réponse WHO
+#define RPL_ENDOFWHO          "315" // Fin de la liste WHO
+#define RPL_CHANNELMODEIS     "324" // Mode du canal
 
 // Erreurs (400-599)
 #define ERR_NOSUCHNICK        "401" // Pseudo/canal inexistant
