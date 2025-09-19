@@ -41,6 +41,7 @@
 #define RPL_WHOREPLY          "352" // Réponse WHO
 #define RPL_ENDOFWHO          "315" // Fin de la liste WHO
 #define RPL_CHANNELMODEIS     "324" // Mode du canal
+#define RPL_INVITING          "341" // Utilisateur invité
 
 // Erreurs (400-599)
 #define ERR_NOSUCHNICK        "401" // Pseudo/canal inexistant
@@ -59,6 +60,7 @@
 #define ERR_NONICKNAMEGIVEN   "431" // Aucun pseudo fourni
 #define ERR_ERRONEUSNICKNAME  "432" // Pseudo erroné
 #define ERR_NICKNAMEINUSE     "433" // Pseudo déjà utilisé
+#define ERR_USERONCHANNEL     "443" // Utilisateur déjà sur le canal
 #define ERR_NOTONCHANNEL      "442" // Vous n'êtes pas sur ce canal
 #define ERR_NOTREGISTERED     "451" // Vous n'êtes pas enregistré
 #define ERR_TOOMANYPARAMS     "460" // Trop de paramètres

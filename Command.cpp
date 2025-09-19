@@ -398,10 +398,14 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 			cl->sendMessage(formatError(ERR_BADCHANNELKEY, targetChan->getName(), "Cannot join channel (+k)"));
 			continue ;
 		}
-		if (targetChan->isInviteOnly() && !targetChan->isUserInChannel(cl))
+		if (targetChan->isInviteOnly())
 		{
-			cl->sendMessage(formatError(ERR_INVITEONLYCHAN, targetChan->getName(), "Cannot join channel (+i)"));
-			continue ;
+			if (std::find(targetChan->getInvitations().begin(), targetChan->getInvitations().end(), cl) == targetChan->getInvitations().end())
+			{
+				cl->sendMessage(formatError(ERR_INVITEONLYCHAN, targetChan->getName(), "Cannot join channel (+i)"));
+				continue ;
+			}
+			targetChan->deleteInvitation(cl);
 		}
 		if (!(*cl += targetChan))
 		{
@@ -943,5 +947,78 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	cl->sendMessage(formatMessage(RPL_ENDOFWHO, target, mask + " :End of WHO list"));
+	return (1);
+}
+
+char	Server::invite(Client *const cl, const std::vector<std::string> &tokens)
+{
+	std::string target = cl->getNick().empty() ? "*" : cl->getNick();
+
+	if (!cl->isRegistered())
+	{
+		cl->sendMessage(formatError(ERR_NOTREGISTERED, target, "You have not registered"));
+		return (1);
+	}
+
+	if (tokens.size() < 3)
+	{
+		cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "INVITE :Not enough parameters"));
+		return (1);
+	}
+
+	if (tokens.size() > 3)
+	{
+		cl->sendMessage(formatError(ERR_TOOMANYPARAMS, target, "INVITE :Too many parameters"));
+		return (1);
+	}
+
+	std::string targetNick = tokens[1];
+	std::string channelName = tokens[2];
+
+	Channel *chan = getChannel(channelName);
+	if (!chan)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur qui invite est dans le canal
+	if (!chan->isUserInChannel(cl))
+	{
+		cl->sendMessage(formatError(ERR_NOTONCHANNEL, target, channelName + " :You're not on that channel"));
+		return (1);
+	}
+
+	// Trouver l'utilisateur à inviter
+	Client *targetUser = getClient(targetNick);
+	if (!targetUser)
+	{
+		cl->sendMessage(formatError(ERR_NOSUCHNICK, target, targetNick + " :No such nick"));
+		return (1);
+	}
+
+	// Vérifier si l'utilisateur n'est pas déjà sur le canal
+	if (chan->isUserInChannel(targetUser))
+	{
+		cl->sendMessage(formatError(ERR_USERONCHANNEL, target, targetNick + " " + channelName + " :is already on channel"));
+		return (1);
+	}
+
+	// Pour un canal en mode +i, seuls les opérateurs peuvent inviter
+	if (chan->isInviteOnly() && !chan->isUserOperator(cl))
+	{
+		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
+		return (1);
+	}
+
+	// Add invitation
+	chan->addInvitation(targetUser);
+
+	// Envoyer l'invitation à l'utilisateur cible
+	targetUser->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 INVITE " + targetNick + " :" + channelName + "\r\n");
+
+	// Confirmer l'invitation à celui qui invite
+	cl->sendMessage(formatMessage(RPL_INVITING, target, targetNick + " " + channelName));
+
 	return (1);
 }

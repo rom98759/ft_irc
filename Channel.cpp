@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 13:05:10 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/19 15:36:20 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,4 +77,27 @@ bool Channel::isUserOperator(Client *user) const
 			return (_list[i].second.find('~') != std::string::npos);
 	}
 	return false;
+}
+
+void Channel::addInvitation(Client *user)
+{
+	for (size_t i = 0; i < _invitations.size(); ++i)
+	{
+		if (_invitations[i] == user)
+			return;
+	}
+	_invitations.push_back(user);
+}
+
+void	Channel::deleteInvitation(Client *user)
+{
+	std::size_t isize = _invitations.size();
+	for (std::size_t i = 0; i < isize; ++i)
+	{
+		if (_invitations[i] == user)
+		{
+			_invitations.erase(_invitations.begin() + i);
+			break ;
+		}
+	}
 }

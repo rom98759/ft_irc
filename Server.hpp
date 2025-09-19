@@ -30,6 +30,7 @@
 #include <signal.h>     // Pour signal
 #include <errno.h>      // Pour errno
 #include <cstdlib>      // Pour atoi
+#include <algorithm>   // Pour std::find
 
 // Inclusions du projet
 #include "IrcCodes.hpp"
@@ -105,6 +106,7 @@ class	Server
 		char							who(Client *const, const std::vector<std::string> &tokens);
 		char							debug(Client *const, const std::vector<std::string> &tokens);
 		char							privmsg(Client *const cl, const std::vector<std::string> &tokens);
+		char							invite(Client *const cl, const std::vector<std::string> &tokens);
 	private: /* -Operators- */
 		Server							&operator+=(Client *const cl);
 		Server							&operator-=(Client *const cl);

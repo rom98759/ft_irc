@@ -191,6 +191,7 @@ void	Server::initEvents(void)
 	addEvent("MODE", &Server::mode);
 	addEvent("KICK", &Server::kick);
 	addEvent("WHO", &Server::who);
+	addEvent("INVITE", &Server::invite);
 }
 
 bool	Server::initServer(void)

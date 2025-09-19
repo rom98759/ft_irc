@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 13:27:45 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 12:46:40 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/19 13:47:50 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,7 @@ class	Channel
 				std::string
 			>
 		>					_list;
+		std::vector<Client *>	_invitations;	// Liste des utilisateurs invités (pour mode +i)
 	public:
 		Channel(const std::string &name, const std::string &key);
 		Channel(void) {};
@@ -56,6 +57,7 @@ class	Channel
 			>
 		>					&getList(void) const { return (_list); };
 		char				isFull(void) const { return (_hasUserLimit && (int)_list.size() >= _clientsLimit); };
+		const std::vector<Client *>& getInvitations(void) const { return (_invitations); };
 	public: /* -Setters- */
 		void				setName(const std::string &newName) { _name = newName; };
 		void				setClientsLimit(const int &i) { _clientsLimit = i; };
@@ -64,6 +66,9 @@ class	Channel
 		void				setTopicRestricted(bool restricted) { _topicRestricted = restricted; };
 		void				setUserLimit(int limit) { _clientsLimit = limit; _hasUserLimit = (limit > 0); };
 		void				setInviteOnly(bool inviteOnly) { _inviteOnly = inviteOnly; };
+		void				addInvitation(Client *user);
+		void				deleteInvitation(Client *user);
+
 	public: /* -Helper Methods- */
 		bool				isUserInChannel(Client *user) const;
 		bool				isUserOperator(Client *user) const;
