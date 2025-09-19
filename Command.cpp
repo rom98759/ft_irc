@@ -922,13 +922,12 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 		for (size_t i = 0; i < chanList.size(); ++i)
 		{
 			Client *user = chanList[i].first;
-			std::string away = "H"; // H = here, G = away (pas implémenté)
 			std::string op = chan->isUserOperator(user) ? "@" : ""; // @ = opérateur, "" = non opérateur
 
 			// Format: RPL_WHOREPLY "<channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <real name>"
 			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
 				mask + " " + user->getUsername() + " 127.0.0.1 " +
-				user->getNick() + " " + away + op + " :0 " + user->getRealname()));
+				user->getNick() + " " + op + " :0 " + user->getRealname()));
 		}
 	}
 	else
@@ -939,7 +938,7 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 		{
 			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
 				"* " + user->getUsername() + " 127.0.0.1 " +
-				user->getNick() + " H :0 " + user->getRealname()));
+				user->getNick() + " :0 " + user->getRealname()));
 		}
 	}
 
