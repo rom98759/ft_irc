@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 15:36:20 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/19 16:05:11 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,6 +97,32 @@ void	Channel::deleteInvitation(Client *user)
 		if (_invitations[i] == user)
 		{
 			_invitations.erase(_invitations.begin() + i);
+			break ;
+		}
+	}
+}
+
+void	Channel::addOperator(Client *user)
+{
+	for (size_t i = 0; i < _list.size(); ++i)
+	{
+		if (_list[i].first == user)
+		{
+			_list[i].second += "~";
+			break ;
+		}
+	}
+}
+
+void	Channel::removeOperator(Client *user)
+{
+	for (size_t i = 0; i < _list.size(); ++i)
+	{
+		if (_list[i].first == user)
+		{
+			size_t pos = _list[i].second.find('~');
+			if (pos != std::string::npos)
+				_list[i].second.erase(pos, 1);
 			break ;
 		}
 	}

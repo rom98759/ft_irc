@@ -474,6 +474,13 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 			*targetChan -= cl;
 			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + cl->reason + "\r\n";
 			targetChan->mall(partMsg);
+
+			// Si le canal devient vide, le supprimer du serveur
+			if (targetChan->getList().empty())
+			{
+				*this -= targetChan;
+				delete targetChan;
+			}
 		}
 		else
 		{
@@ -810,6 +817,37 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 				chan->setKey("");
 			}
 		}
+		else if (c == 'o')
+		{
+			if (paramIndex < tokens.size())
+			{
+				Client *targetUser = getClient(tokens[paramIndex]);
+				if (targetUser && chan->isUserInChannel(targetUser))
+				{
+					if (adding)
+					{
+						chan->addOperator(targetUser);
+					}
+					else
+					{
+						chan->removeOperator(targetUser);
+					}
+				}
+				else if (!targetUser)
+				{
+					cl->sendMessage(formatError(ERR_NOSUCHNICK, target, tokens[paramIndex] + " :No such nick/channel"));
+				}
+				else
+				{
+					cl->sendMessage(formatError(ERR_USERNOTINCHANNEL, target, tokens[paramIndex] + " " + channelName + " :They aren't on that channel"));
+				}
+				paramIndex++;
+			}
+			else
+			{
+				cl->sendMessage(formatError(ERR_NEEDMOREPARAMS, target, "MODE :Not enough parameters"));
+			}
+		}
 		else
 		{
 			cl->sendMessage(formatError(ERR_UNKNOWNMODE, target, std::string(1, c) + " :is unknown mode char to me"));
@@ -889,6 +927,13 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 	// Retirer l'utilisateur du canal
 	*kickUser -= chan;
 	*chan -= kickUser;
+
+	// Si le canal devient vide, le supprimer du serveur
+	if (chan->getList().empty())
+	{
+		*this -= chan;
+		delete chan;
+	}
 
 	return (1);
 }

@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 13:27:45 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 13:47:50 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/19 16:05:26 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,6 +68,8 @@ class	Channel
 		void				setInviteOnly(bool inviteOnly) { _inviteOnly = inviteOnly; };
 		void				addInvitation(Client *user);
 		void				deleteInvitation(Client *user);
+		void				addOperator(Client *user);
+		void				removeOperator(Client *user);
 
 	public: /* -Helper Methods- */
 		bool				isUserInChannel(Client *user) const;
