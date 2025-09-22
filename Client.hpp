@@ -14,12 +14,11 @@
 
 #include "Channel.hpp"
 
-// Inclusions de la bibliothèque standard
 #include <string>
 #include <iostream>
+#include <sys/socket.h>  // Pour recv, send
+#include <cstring>       // Pour memset, strerror
 #include <exception>  // Pour std::exception
-
-// Inclusions système
 #include <unistd.h>  // Pour close
 
 #define CHPERCL 16
@@ -40,7 +39,7 @@ class	Client
 		std::string						_nick;
 		std::string						_username;
 		std::string						_realname;
-		std::string						_buffer;     // Buffer stocker données reçues
+		std::string						_buffer;            // Buffer stocker données reçues
 		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
 		Channel							*_channels[CHPERCL];
 

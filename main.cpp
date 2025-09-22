@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/08/26 12:02:16 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/10 15:00:58 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/22 21:23:54 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -59,7 +59,6 @@ int	main(int argc, char *argv[])
 
 	srv.run();
 
-	// La méthode run() se terminera proprement après un signal
 	return 0;
 }
 

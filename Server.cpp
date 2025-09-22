@@ -101,14 +101,12 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 
 	params.clear();
 
-	// Ignorer les espaces initiaux
 	size_t start = message.find_first_not_of(" \t\r\n\v\f");
 	if (start == std::string::npos)
-		return params; // Que des espaces
+		return params;
 
-	// Vérifier que le message ne commence pas par un espace ou ':'
 	if (message[start] == ':')
-		return params; // Message invalide selon RFC
+		return params;
 
 	// Découper en paramètres
 	std::istringstream iss(message.substr(start));
@@ -116,7 +114,6 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 
 	while (iss >> token && params.size() < MAX_PARAMS)
 	{
-		// Si on trouve un paramètre commençant par ':', prendre tout le reste
 		if (token[0] == ':')
 		{
 			std::string trailing;
@@ -130,7 +127,7 @@ const std::vector<std::string> parseIrcMessage(const std::string &message)
 		}
 	}
 
-	// Si on a atteint la limite de paramètres et qu'il reste du texte
+	// Si limite paramètres atteint
 	if (params.size() >= MAX_PARAMS)
 	{
 		std::string remaining;
@@ -322,7 +319,7 @@ void	Server::run(void)
 	}
 }
 
-// Static signal handler for SIGINT and SIGQUIT
+// signal handler for SIGINT and SIGQUIT
 void	Server::signalHandler(int signum)
 {
 	std::cout << "\n🛑 Server shutdown signal (" << signum << ") received." << std::endl;
@@ -331,7 +328,7 @@ void	Server::signalHandler(int signum)
 		_running = false;
 }
 
-// Configurer les structures pollfd pour le serveur et les clients
+// Configurer structures pollfd serveur et clients
 void	Server::setupPollFds(void)
 {
 	_pollfds.clear();
@@ -538,7 +535,7 @@ int	Server::handleClientMessage(Client *client)
 		size_t pos = std::string::npos;
 		size_t lineEndSize = 0;
 
-		// D'abord chercher \r\n (protocole IRC standard)
+		// Chercher \r\n (protocole IRC standard)
 		pos = buffer.find("\r\n");
 		if (pos != std::string::npos)
 		{
@@ -629,8 +626,4 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 
 	// Supprimer le client à la fin
 	*this -= client;
-	// Ne plus utiliser la variable client après cette ligne!
 }
-/* ********************* |Server Loop : Client Handling| ********************* */
-
-/* ****************************** |Server Loop| ****************************** */

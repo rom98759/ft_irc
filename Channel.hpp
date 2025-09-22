@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 13:27:45 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 16:05:26 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/22 21:34:24 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,6 @@ class	Channel
 		std::string			_key;
 		int					_clientsLimit;
 		std::string			_topic;
-		std::string			_modes;			// Modes du canal (+tnlk)
 		bool				_topicRestricted;	// Mode +t
 		bool				_hasUserLimit;		// Mode +l
 		bool				_hasKey;			// Mode +k
@@ -45,7 +44,7 @@ class	Channel
 		const int			&getClientsLimit(void) const { return (_clientsLimit); };
 		const std::string	&getKey(void) const { return (_key); };
 		const std::string	&getTopic(void) const { return (_topic); };
-		const std::string	&getModes(void) const { return (_modes); };
+		const int			&getUserLimit(void) const { return (_clientsLimit); };
 		bool				isTopicRestricted(void) const { return (_topicRestricted); };
 		bool				hasUserLimit(void) const { return (_hasUserLimit); };
 		bool				hasKey(void) const { return (_hasKey); };
@@ -59,7 +58,6 @@ class	Channel
 		char				isFull(void) const { return (_hasUserLimit && (int)_list.size() >= _clientsLimit); };
 		const std::vector<Client *>& getInvitations(void) const { return (_invitations); };
 	public: /* -Setters- */
-		void				setName(const std::string &newName) { _name = newName; };
 		void				setClientsLimit(const int &i) { _clientsLimit = i; };
 		void				setKey(const std::string &newKey) { _key = newKey; _hasKey = !newKey.empty(); };
 		void				setTopic(const std::string &newTopic) { _topic = newTopic; };

@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/19 17:43:35 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/22 10:13:53 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,6 @@ Channel::Channel(const std::string &name, const std::string &key)
 	_key = key;
 	_clientsLimit = 10;
 	_topic = "";
-	_modes = "tl";  // Modes par défaut : +t (topic restricted) et +l (user limit)
 	_inviteOnly = false;
 	_topicRestricted = true;
 	_hasUserLimit = true; // default 10

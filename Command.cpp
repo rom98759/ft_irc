@@ -41,7 +41,6 @@ static char	ft_isValidRealname(const std::string &realname)
 	for (std::size_t i = 0; i < rsize; ++i)
 	{
 		char c = realname.at(i);
-		// RFC 1459: réel nom peut contenir espaces et caractères imprimables
 		if (!std::isprint(c) && c != ' ')
 			return (0);
 	}
@@ -414,14 +413,11 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		*targetChan += cl;
 
-		// Format RFC pour JOIN
 		std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 JOIN :" + targetChan->getName() + "\r\n";
 		targetChan->mall(joinMsg);
 
-		// Topic (332)
 		cl->sendMessage(formatMessage("332", cl->getNick(), targetChan->getName() + " :Welcome to " + targetChan->getName()));
 
-		// Liste des utilisateurs (353)
 		std::string userList = "";
 		const std::vector<std::pair<Client*, std::string> >& members = targetChan->getList();
 		for (std::vector<std::pair<Client*, std::string> >::const_iterator it = members.begin(); it != members.end(); ++it)
@@ -432,7 +428,6 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		cl->sendMessage(formatMessage("353", cl->getNick(), "= " + targetChan->getName() + " :" + userList));
 
-		// Fin de la liste (366)
 		cl->sendMessage(formatMessage("366", cl->getNick(), targetChan->getName() + " :End of /NAMES list"));
 	}
 	return (1);
@@ -566,7 +561,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 	{
 		std::string currentTarget = recipients[i];
 
-		// Vérifier si le destinataire est vide
+		// destinataire vide
 		if (currentTarget.empty())
 		{
 			cl->sendMessage(formatError(ERR_NORECIPIENT, target, "No recipient given (PRIVMSG)"));
@@ -576,7 +571,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		bool found = false;
 		std::size_t csize = _clients.size();
 
-		// Vérifier si c'est un canal
+		// si canal
 		if (currentTarget[0] == '#' && currentTarget.length() > 1)
 		{
 			Channel *chan = getChannel(currentTarget);
@@ -586,7 +581,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 				continue;
 			}
 
-			// Vérifier si le client est membre du canal
+			// client membre canal
 			const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
 			std::size_t lsize = chanList.size();
 			bool isInChannel = chan->isUserInChannel(cl);
@@ -597,7 +592,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 				continue;
 			}
 
-			// Envoyer le message à tous les membres du canal sauf l'expéditeur
+			// Envoyer msg a tous les membres canal sauf l'expéditeur
 			for (std::size_t j = 0; j < lsize; ++j)
 			{
 				if (chanList[j].first != cl)
@@ -606,12 +601,11 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 			continue;
 		}
 
-		// Rechercher l'utilisateur
+		// Rechercher utilisateur
 		for (std::size_t j = 0; j < csize; ++j)
 		{
 			if (_clients[j]->getNick() == currentTarget && _clients[j]->isRegistered())
 			{
-				// Envoyer le message à l'utilisateur trouvé
 				_clients[j]->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
 				found = true;
 				break;
@@ -659,7 +653,7 @@ char	Server::topic(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Vérifier si l'utilisateur est dans le canal
+	// Vérifier utilisateur dans canal
 	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
 	bool isInChannel = chan->isUserInChannel(cl);
 
@@ -669,7 +663,7 @@ char	Server::topic(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Si pas de nouveau topic spécifié, retourner le topic actuel
+	// ARG == 2 -> retourner le topic actuel
 	if (tokens.size() == 2)
 	{
 		if (chan->getTopic().empty())
@@ -682,7 +676,7 @@ char	Server::topic(Client *const cl, const std::vector<std::string> &tokens)
 	// Vérifier si le mode +t est activé
 	if (chan->isTopicRestricted())
 	{
-		// Vérifier si l'utilisateur est opérateur
+		// utilisateur opérateur ?
 		if (chanList.empty() || chan->isUserOperator(cl) == false)
 		{
 			cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
@@ -733,24 +727,35 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
+	// Vérifier si l'utilisateur est opérateur du canal
+	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
+	if (chanList.empty() || chan->isUserOperator(cl) == false)
+	{
+		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
+		return (1);
+	}
+
 	// Si pas de mode spécifié, retourner les modes actuels
 	if (tokens.size() == 2)
 	{
 		std::string modeString = "+";
 		if (chan->isInviteOnly()) modeString += "i";
 		if (chan->isTopicRestricted()) modeString += "t";
-		if (chan->hasUserLimit()) modeString += "l";
-		if (chan->hasKey()) modeString += "k";
+		if (chan->hasUserLimit())
+		{
+			std::ostringstream convert;
+			convert << chan->getUserLimit();
+			modeString += "l";
+			modeString += " " + convert.str() + " ";
+		}
+
+		if (chan->hasKey())
+		{
+			modeString += "k";
+			modeString += " " + chan->getKey() + " ";
+		}
 
 		cl->sendMessage(formatMessage(RPL_CHANNELMODEIS, target, channelName + " " + modeString));
-		return (1);
-	}
-
-	// Vérifier si l'utilisateur est opérateur du canal
-	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
-	if (chanList.empty() || chan->isUserOperator(cl) == false)
-	{
-		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));
 		return (1);
 	}
 
@@ -828,7 +833,7 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 				}
 				else if (!targetUser)
 				{
-					cl->sendMessage(formatError(ERR_NOSUCHNICK, target, tokens[paramIndex] + " :No such nick/channel"));
+					cl->sendMessage(formatError(ERR_NOSUCHNICK, target, tokens[paramIndex] + " :No such nick"));
 				}
 				else
 				{
@@ -888,7 +893,7 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Vérifier si l'utilisateur qui kick est opérateur
+	// Kick est opérateur ?
 	const std::vector<std::pair<Client *, std::string> > &chanList = chan->getList();
 	if (chanList.empty() || chan->isUserOperator(cl) == false)
 	{
@@ -896,11 +901,11 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Trouver l'utilisateur à kicker
+	// Find user to kick
 	Client *kickUser = getClient(kickNick);
 	if (!kickUser)
 	{
-		cl->sendMessage(formatError(ERR_NOSUCHNICK, target, kickNick + " :No such nick/channel"));
+		cl->sendMessage(formatError(ERR_NOSUCHNICK, target, kickNick + " :No such nick"));
 		return (1);
 	}
 
@@ -959,7 +964,7 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 			Client *user = chanList[i].first;
 			std::string op = chan->isUserOperator(user) ? "@" : ""; // @ = opérateur, "" = non opérateur
 
-			// Format: RPL_WHOREPLY "<channel> <user> <host> <server> <nick> <H|G>[*][@|+] :<hopcount> <real name>"
+			// Format: RPL_WHOREPLY
 			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
 				mask + " " + user->getUsername() + " 127.0.0.1 " +
 				user->getNick() + " " + op + " :0 " + user->getRealname()));
@@ -1013,14 +1018,14 @@ char	Server::invite(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Vérifier si l'utilisateur qui invite est dans le canal
+	// Si utilisateur pas dans canal
 	if (!chan->isUserInChannel(cl))
 	{
 		cl->sendMessage(formatError(ERR_NOTONCHANNEL, target, channelName + " :You're not on that channel"));
 		return (1);
 	}
 
-	// Trouver l'utilisateur à inviter
+	// Utilisateur cible
 	Client *targetUser = getClient(targetNick);
 	if (!targetUser)
 	{
@@ -1028,14 +1033,14 @@ char	Server::invite(Client *const cl, const std::vector<std::string> &tokens)
 		return (1);
 	}
 
-	// Vérifier si l'utilisateur n'est pas déjà sur le canal
+	// User dans le canal
 	if (chan->isUserInChannel(targetUser))
 	{
 		cl->sendMessage(formatError(ERR_USERONCHANNEL, target, targetNick + " " + channelName + " :is already on channel"));
 		return (1);
 	}
 
-	// Pour un canal en mode +i, seuls les opérateurs peuvent inviter
+	// MODE +i, seuls les opérateurs peuvent inviter
 	if (chan->isInviteOnly() && !chan->isUserOperator(cl))
 	{
 		cl->sendMessage(formatError(ERR_CHANOPRIVSNEEDED, target, channelName + " :You're not channel operator"));

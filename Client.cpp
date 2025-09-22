@@ -12,10 +12,6 @@
 
 #include "Client.hpp"
 
-// Inclusions système supplémentaires nécessaires pour l'implémentation
-#include <sys/socket.h>  // Pour recv, send
-#include <cstring>       // Pour memset, strerror
-
 const ErrorFdException	Client::EFE;
 
 Client::Client(const int &fd) : _fd(fd), _registerLevel(0)
@@ -100,6 +96,13 @@ void Client::appendToBuffer(const std::string &data)
 
 bool Client::sendMessage(const std::string &message)
 {
+	if (message.empty())
+		return true;
+	// if (message.length() > 510) // 512 - 2 (\r\n)
+	// {
+	// 	std::cout << "Message trop long du client fd=" << _fd << " (" << message.length() << " octets), tronqué" << std::endl;
+	// 	message = message.substr(0, 510);
+	// }
 	ssize_t bytesSent = send(_fd, message.c_str(), message.length(), 0);
 
 	// Erreur d'envoi

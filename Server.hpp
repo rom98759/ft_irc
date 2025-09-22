@@ -79,7 +79,6 @@ class	Server
 		void							disconnectClient(Client *client, const std::string &reason);
 
 		// Gestion des cannaux
-		char							createChannel(const std::string &name, const std::string &key);
 		Channel							*getChannel(const std::string &name) const;
 
 		Client							*getClient(const std::string &nick) const;
