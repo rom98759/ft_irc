@@ -613,12 +613,15 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 	// Envoyer le message de déconnexion AVANT de supprimer le client
 	if (isRegistered)
 	{
-		client->reason = reason;
 		Channel	**const chans = client->getChannels();
 		for (int i = 0; i < CHPERCL; ++i)
+		{
 			if (*(chans + i) != NULL)
+			{
+				(*(chans + i))->mall(":" + client->getNick() + "!" + client->getUsername() + "@127.0.0.1 PART " + (*(chans + i))->getName() + " :" + reason + "\r\n");
 				**(chans + i) -= client;
-		mall(":" + nickname + " QUIT :Quit: " + reason + "\r\n");
+			}
+		}
 	}
 
 	// Supprimer le client à la fin

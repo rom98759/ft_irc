@@ -30,7 +30,7 @@ Channel::Channel(const std::string &name, const std::string &key)
 Channel	&Channel::operator+=(Client *const cl)
 {
 	if (!_list.size())
-		_list.push_back(std::pair<Client *, std::string>(cl, "~+"));
+		_list.push_back(std::pair<Client *, std::string>(cl, "@+"));
 	else
 		_list.push_back(std::pair<Client *, std::string>(cl, "+"));
 	return (*this);
@@ -75,7 +75,7 @@ bool Channel::isUserOperator(Client *user) const
 	for (size_t i = 0; i < _list.size(); ++i)
 	{
 		if (_list[i].first == user)
-			return (_list[i].second.find('~') != std::string::npos);
+			return (_list[i].second.find('@') != std::string::npos);
 	}
 	return false;
 }
@@ -109,7 +109,7 @@ void	Channel::addOperator(Client *user)
 	{
 		if (_list[i].first == user)
 		{
-			_list[i].second += "~";
+			_list[i].second += '@';
 			break ;
 		}
 	}
@@ -121,7 +121,8 @@ void	Channel::removeOperator(Client *user)
 	{
 		if (_list[i].first == user)
 		{
-			size_t pos = _list[i].second.find('~');
+			size_t pos = _list[i].second.find('@');
+			std::cout << pos << std::endl;
 			if (pos != std::string::npos)
 				_list[i].second.erase(pos, 1);
 			break ;

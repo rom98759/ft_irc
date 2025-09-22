@@ -464,7 +464,7 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		if (*cl -= targetChan)
 		{
-			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + (tsize > 2 ? tokens[2] : "") + "\r\n";
+			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + (tsize > 2 ? tokens[2] : "Leaving") + "\r\n";
 			targetChan->mall(partMsg);
 			*targetChan -= cl;
 		}
@@ -680,9 +680,9 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 	std::string channelName = tokens[1];
 
 	// Canal error
-	if (channelName[0] != '#')
+	if (!ft_isValidChannelMask(channelName))
 	{
-		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		cl->sendMessage(formatError(ERR_BADCHANMASK, target, channelName + " :Bad channel mask"));
 		return (1);
 	}
 
@@ -790,7 +790,10 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 				{
 					if (adding)
 					{
-						chan->addOperator(targetUser);
+						if (chan->isUserOperator(targetUser))
+							cl->sendMessage(formatError("Can't edit user mode", targetUser->getNick(), "MODE :Already operator"));
+						else
+							chan->addOperator(targetUser);
 					}
 					else
 					{

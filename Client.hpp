@@ -70,8 +70,6 @@ class	Client
 		bool							sendMessage(const std::string &message); // Envoyer un message au client
 		char							cannotJoinNChannels(int n) const;
 		std::string						getSheet(void) const;
-	public: /* -Free Use- */
-		std::string						reason;
 	public: /* -Exceptions- */
 		static const ErrorFdException	EFE;
 };
