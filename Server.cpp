@@ -36,8 +36,6 @@ Server::~Server(void)
 	while (!_clients.empty())
 		disconnectClient(_clients[0], "Server shutdown");
 
-	while (!_channels.empty())
-		*this -= _channels[0];
 	close(_fd);
 	std::cout << "\nServer Shutdown !" << std::endl;
 }
@@ -182,7 +180,6 @@ void	Server::initEvents(void)
 	addEvent("PING", &Server::ping);
 	addEvent("JOIN", &Server::join);
 	addEvent("PART", &Server::part);
-	addEvent("DEBUG", &Server::debug);
 	addEvent("PRIVMSG", &Server::privmsg);
 	addEvent("TOPIC", &Server::topic);
 	addEvent("MODE", &Server::mode);

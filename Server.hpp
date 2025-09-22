@@ -40,8 +40,6 @@ class	Client;
 
 class	Channel;
 
-extern const Channel	g_nChan;
-
 class	Server
 {
 	private:
@@ -103,15 +101,14 @@ class	Server
 		char							mode(Client *const, const std::vector<std::string> &tokens);
 		char							kick(Client *const, const std::vector<std::string> &tokens);
 		char							who(Client *const, const std::vector<std::string> &tokens);
-		char							debug(Client *const, const std::vector<std::string> &tokens);
 		char							privmsg(Client *const cl, const std::vector<std::string> &tokens);
 		char							invite(Client *const cl, const std::vector<std::string> &tokens);
-	private: /* -Operators- */
+
+	public: /* -Operators- */
 		Server							&operator+=(Client *const cl);
 		Server							&operator-=(Client *const cl);
 		Server							&operator+=(Channel *const ch);
 		Server							&operator-=(Channel *const ch);
-
 	public: /* -CDstructors- */
 		Server(const unsigned short &port, const std::string &pw);
 		~Server(void);
@@ -120,7 +117,7 @@ class	Server
 		const std::string				&getPw(void) const { return (_pw); };
 		const int						&getFd(void) const { return (_fd); };
 		const std::vector<Client *>		&getClients(void) const { return (_clients); };
-		static const Server				*getInstance(void) { return (_instance); };
+		static Server *const			&getInstance(void) { return (_instance); };
 		static const bool				&isRunning(void) { return (_running); };
 		const std::vector<Channel *>	&getChannels(void) const { return (_channels); };
 	public: /* -Methods- */

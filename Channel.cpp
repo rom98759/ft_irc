@@ -47,6 +47,8 @@ Channel	&Channel::operator-=(Client *const cl)
 			break ;
 		}
 	}
+	if (_list.empty())
+		*Server::getInstance() -= this;
 	return (*this);
 }
 

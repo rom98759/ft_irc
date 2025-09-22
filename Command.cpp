@@ -361,7 +361,6 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 	}
 	std::vector<std::string>	chans = ft_split(tokens[1], ',');
 	std::size_t					csize = chans.size();
-	// TODO: Determine wether we handle (and how) empty strings or not
 	if (cl->cannotJoinNChannels(csize))
 	{
 		cl->sendMessage(formatError(ERR_TOOMANYCHANNELS, target, "JOIN :You plan to join too many channels"));
@@ -465,10 +464,9 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		if (*cl -= targetChan)
 		{
-			cl->reason = (tsize > 2 ? tokens[2] : "");
-			*targetChan -= cl;
-			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + cl->reason + "\r\n";
+			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + (tsize > 2 ? tokens[2] : "") + "\r\n";
 			targetChan->mall(partMsg);
+			*targetChan -= cl;
 		}
 		else
 		{
@@ -476,38 +474,6 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 			continue ;
 		}
 	}
-	return (1);
-}
-
-// Fonction débogage pour afficher l'état d'enregistrement du client
-char	Server::debug(Client *const cl, const std::vector<std::string> &tokens)
-{
-	(void)tokens;
-
-	std::string status = "--- DEBUG CLIENT STATUS ---\r\n";
-	status += "- Register Level: " + levelToString(cl->getRegisterLevel()) + "/3\r\n";
-	status += "- Is Registered: " + std::string(cl->isRegistered() ? "Yes" : "No") + "\r\n";
-	status += "- Nickname: " + (cl->getNick().empty() ? "[Not Set]" : cl->getNick()) + "\r\n";
-	status += "- Username: " + (cl->getUsername().empty() ? "[Not Set]" : cl->getUsername()) + "\r\n";
-	status += "- Realname: " + (cl->getRealname().empty() ? "[Not Set]" : cl->getRealname()) + "\r\n";
-	status += "- Binary RegisterLevel: ";
-
-	unsigned char level = cl->getRegisterLevel();
-	for (int i = 1; i >= 0; i--)
-		status += ((level >> i) & 1) ? "1" : "0";
-
-	status += "\r\n";
-	status += "-------------------------\r\n";
-	status += "--- DEBUG CLIENT CHANNELS ---\r\n";
-	Channel **chans = cl->getChannels();
-	for (int i = 0; i < CHPERCL; ++i)
-	{
-		if (chans[i] != NULL)
-			status += "  - " + chans[i]->getName() + (chans[i]->getKey().empty() ? " (key: NA)" : " (key: " + chans[i]->getKey() + ")") + "\r\n";
-	}
-	status += "----------------------------\r\n";
-
-	cl->sendMessage(status);
 	return (1);
 }
 
@@ -890,6 +856,12 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 	if (!chan)
 	{
 		cl->sendMessage(formatError(ERR_NOSUCHCHANNEL, target, channelName + " :No such channel"));
+		return (1);
+	}
+
+	if (!chan->isUserInChannel(cl))
+	{
+		cl->sendMessage(formatError(ERR_NOTONCHANNEL, target, "KICK :Not on channel"));
 		return (1);
 	}
 
