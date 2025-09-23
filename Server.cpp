@@ -618,7 +618,7 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 		{
 			if (*(chans + i) != NULL)
 			{
-				(*(chans + i))->mall(":" + client->getNick() + "!" + client->getUsername() + "@127.0.0.1 PART " + (*(chans + i))->getName() + " :" + reason + "\r\n");
+				(*(chans + i))->mall(":" + client->getNick() + "!" + client->getUsername() + "@127.0.0.1 QUIT " + (*(chans + i))->getName() + " :" + reason + "\r\n");
 				**(chans + i) -= client;
 			}
 		}

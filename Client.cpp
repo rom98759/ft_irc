@@ -98,11 +98,6 @@ bool Client::sendMessage(const std::string &message)
 {
 	if (message.empty())
 		return true;
-	// if (message.length() > 510) // 512 - 2 (\r\n)
-	// {
-	// 	std::cout << "Message trop long du client fd=" << _fd << " (" << message.length() << " octets), tronqué" << std::endl;
-	// 	message = message.substr(0, 510);
-	// }
 	ssize_t bytesSent = send(_fd, message.c_str(), message.length(), 0);
 
 	// Erreur d'envoi
@@ -114,9 +109,6 @@ bool Client::sendMessage(const std::string &message)
 	else if (static_cast<size_t>(bytesSent) < message.length())
 	{
 		std::cerr << "Envoi partiel au client fd=" << _fd << std::endl;
-		// Envoi en attente
-		// TODO: Implement partial send handling
-		// Mettre le reste du message dans une file d'attente
 		return false;
 	}
 

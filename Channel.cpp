@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/15 15:44:06 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/22 10:13:53 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/23 12:18:36 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,9 +30,9 @@ Channel::Channel(const std::string &name, const std::string &key)
 Channel	&Channel::operator+=(Client *const cl)
 {
 	if (!_list.size())
-		_list.push_back(std::pair<Client *, std::string>(cl, "@+"));
+		_list.push_back(std::pair<Client *, std::string>(cl, "@"));
 	else
-		_list.push_back(std::pair<Client *, std::string>(cl, "+"));
+		_list.push_back(std::pair<Client *, std::string>(cl, ""));
 	return (*this);
 }
 
