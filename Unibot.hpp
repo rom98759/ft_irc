@@ -59,9 +59,12 @@ class Unibot
 	private:
 		void handleIncomingMessages();    // lire messages, push dans _incomingMessages
 		void flushOutgoingMessages();     // envoyer messages depuis _outgoingMessages
+		void handleCommands(const std::string &message); // gérer les commandes spécifiques
 		void sendMessage(const std::string &msg); // push dans _outgoingMessages
 		bool login();                     // sequence de login IRC
 		bool joinGameChannel();          // rejoindre le channel #GAME
+
+		void clearIncomingMessages() { while (!_incomingMessages.empty()) _incomingMessages.pop(); }
 };
 
 int	getNumericResponse(const std::string& message); // extraire le code numérique d'une réponse IRC

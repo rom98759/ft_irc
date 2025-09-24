@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/23 00:30:28 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/24 12:09:25 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/24 12:51:59 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,28 +31,6 @@ void	Unibot::logMessage(const std::string &msg, bool isError) const
 	else
 		std::cout << msg << std::endl;
 }
-
-// void	Unibot::parseIRCMessage(const std::string& message)
-// {
-// 	size_t pos = 0;
-// 	std::string msg = message;
-
-// 	// Skip prefix if present
-// 	if (msg[0] == ':')
-// 	{
-// 		pos = msg.find(' ');
-// 		if (pos == std::string::npos)
-// 			return;
-// 		msg = msg.substr(pos + 1);
-// 	}
-
-// 	// Get command/numeric
-// 	pos = msg.find(' ');
-// 	std::string cmd = (pos == std::string::npos) ? msg : msg.substr(0, pos);
-
-// 	logMessage("[PARSED] Command: " + cmd, false);
-// 	_incomingMessages.push(message);
-// }
 
 int	getNumericResponse(const std::string& message)
 {
@@ -154,9 +132,8 @@ void	Unibot::handleIncomingMessages()
 	while (std::getline(stream, line, '\n'))
 	{
 		// Remove \r if present
-		if (!line.empty() && line[line.length()-1] == '\r')
-			line.erase(line.length()-1);
-
+		if (!line.empty() && line[line.length() - 1] == '\r')
+			line.erase(line.length() - 1);
 		if (!line.empty())
 		{
 			logMessage("Received: " + line, false);
@@ -204,47 +181,41 @@ bool	Unibot::login()
 
 	// Envoi du USER
 	sendMessage("USER unibot 0 * :Unibot IRC");
-
+	
 	// Flush immédiatement
 	flushOutgoingMessages();
 
-	std::string response;
 	bool loggedIn = false;
 	int maxAttempts = 10;
 	int attempts = 0;
 
-	// Attente de la réponse du serveur avec timeout
 	while (!loggedIn && _running && attempts < maxAttempts)
 	{
 		attempts++;
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-
 		int ret = poll(fds, 1, 1000); // 1 second timeout
-		if (ret <= 0) continue;
-
+		if (ret <= 0)
+			continue;
 		if (fds[0].revents & POLLIN)
 		{
 			handleIncomingMessages();
 			while (!_incomingMessages.empty())
 			{
-				response = getLastMessage();
+				std::string response = getLastMessage();
 				int numeric = getNumericResponse(response);
-
-				if (numeric == 001) // RPL_WELCOME
-				{
+				if (numeric == 001)
+				{ // RPL_WELCOME
 					loggedIn = true;
 					break;
 				}
-				else if (numeric == 433) // ERR_NICKNAMEINUSE
-				{
+				else if (numeric == 433)
+				{ // ERR_NICKNAMEINUSE
 					logMessage("Nickname already in use, trying another one", false);
 					nickAttempt++;
 					oss.str("");
-					oss << "unibot";
-					if (nickAttempt > 0)
-						oss << nickAttempt;
+					oss << "unibot" << nickAttempt;
 					nickname = oss.str();
 					sendMessage("NICK " + nickname);
 					flushOutgoingMessages();
@@ -258,53 +229,76 @@ bool	Unibot::login()
 		logMessage("Login failed after multiple attempts", true);
 		return false;
 	}
-
 	logMessage("Login successful with nickname: " + nickname, false);
 	return true;
 }
 
 bool	Unibot::joinGameChannel()
 {
+	sendMessage("JOIN #GAME");
+	flushOutgoingMessages();
+
 	bool joined = false;
 	int maxAttempts = 10;
 	int attempts = 0;
 
-	sendMessage("JOIN #GAME");
-	flushOutgoingMessages();
-
-
-	// Attente de la réponse du serveur
-	std::string response;
-	handleIncomingMessages();
-	while (_running && attempts < maxAttempts)
+	while (!joined && _running && attempts < maxAttempts)
 	{
 		attempts++;
-		response = getLastMessage();
-		if (!response.empty())
+		struct pollfd fds[1];
+		fds[0].fd = _fd;
+		fds[0].events = POLLIN;
+		int ret = poll(fds, 1, 1000); // 1 second timeout
+		if (ret <= 0)
+			continue;
+		if (fds[0].revents & POLLIN)
 		{
-			logMessage("Received: " + response, false);
-			if (response.find("JOIN :#GAME") != std::string::npos)
+			handleIncomingMessages();
+			while (!_incomingMessages.empty())
 			{
-				logMessage("Successfully joined channel #GAME", false);
-				joined = true;
-				break;
+				std::string response = getLastMessage();
+				if (response.find("JOIN :#GAME") != std::string::npos)
+				{
+					logMessage("Successfully joined channel #GAME", false);
+					joined = true;
+					break;
+				}
+				else if (response.find("ERR_CANNOTJOIN") != std::string::npos)
+				{
+					logMessage("Cannot join channel #GAME", true);
+					break;
+				}
 			}
 		}
 	}
 
-	logMessage("Join #GAME " + std::string(joined ? "succeeded" : "failed"), !joined);
-	return joined;
+	if (!joined)
+	{
+		logMessage("Failed to join #GAME channel after multiple attempts", true);
+		return false;
+	}
+	return true;
 }
 
-void	Unibot::run()
+void Unibot::handleCommands(const std::string &message) {
+	std::cout << "Handling command: " << message << std::endl;
+	if (message.find("!CACA") != std::string::npos) {
+		std::cout << "Received !CACA command" << std::endl;
+		sendMessage("PRIVMSG #GAME :PROUUUUUUT");
+	} else if (message.find("!PING") != std::string::npos) {
+		sendMessage("PRIVMSG #GAME :PONG");
+	} else if (message.find("!EXIT") != std::string::npos) {
+		_running = false;
+	}
+}
+
+void Unibot::run()
 {
 	if (!connectServer())
 	{
 		logMessage("Failed to connect to server", true);
 		return;
 	}
-
-	logMessage("[DEBUG] Starting login sequence", false);
 	if (!login())
 	{
 		logMessage("Login failed", true);
@@ -317,13 +311,12 @@ void	Unibot::run()
 		disconnect();
 		return;
 	}
-
+	clearIncomingMessages();
 	while (_running)
 	{
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-
 		int ret = poll(fds, 1, 5000); // 5 seconds timeout
 		if (ret < 0)
 		{
@@ -332,15 +325,19 @@ void	Unibot::run()
 		}
 		else if (ret == 0)
 		{
-			// logMessage("Poll timeout, no data received", false);
+			// Timeout, no data received
 			continue;
 		}
-
-		// General event handling
 		if (fds[0].revents & POLLIN)
+		{
 			handleIncomingMessages();
-
-		//
+			// Traiter tous les messages entrants immédiatement
+			while (!_incomingMessages.empty())
+			{
+				std::string msg = getLastMessage();
+				handleCommands(msg);
+			}
+		}
 		flushOutgoingMessages();
 	}
 	disconnect();
