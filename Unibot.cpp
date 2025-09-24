@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/23 00:30:28 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/24 10:22:04 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/24 11:30:09 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,43 @@ void	Unibot::logMessage(const std::string &msg, bool isError) const
 		std::cerr << "Error: " << msg << std::endl;
 	else
 		std::cout << msg << std::endl;
+}
+
+// void	Unibot::parseIRCMessage(const std::string& message)
+// {
+// 	size_t pos = 0;
+// 	std::string msg = message;
+
+// 	// Skip prefix if present
+// 	if (msg[0] == ':')
+// 	{
+// 		pos = msg.find(' ');
+// 		if (pos == std::string::npos)
+// 			return;
+// 		msg = msg.substr(pos + 1);
+// 	}
+
+// 	// Get command/numeric
+// 	pos = msg.find(' ');
+// 	std::string cmd = (pos == std::string::npos) ? msg : msg.substr(0, pos);
+
+// 	logMessage("[PARSED] Command: " + cmd, false);
+// 	_incomingMessages.push(message);
+// }
+
+int	getNumericResponse(const std::string& message)
+{
+	size_t pos = message.find(' ');
+	if (pos == std::string::npos || message[0] != ':')
+		return -1;
+
+	std::string numeric = message.substr(pos + 1);
+	pos = numeric.find(' ');
+	if (pos == std::string::npos)
+		return -1;
+
+	numeric = numeric.substr(0, pos);
+	return std::atoi(numeric.c_str());
 }
 
 void	Unibot::disconnect()
@@ -82,6 +119,14 @@ bool	Unibot::connectServer()
 	return true;
 }
 
+std::string	Unibot::getLastMessage()
+{
+	if (_incomingMessages.empty())
+		return "";
+	std::string msg = _incomingMessages.front();
+	_incomingMessages.pop();
+	return msg;
+}
 
 void	Unibot::handleIncomingMessages()
 {
@@ -103,8 +148,14 @@ void	Unibot::handleIncomingMessages()
 	buffer[bytesRead] = '\0';
 	std::string message(buffer);
 	logMessage("Received: " + message, false);
+	_incomingMessages.push(message);
 
 	// Here you can parse the message and respond accordingly
+}
+
+void	Unibot::sendMessage(const std::string &msg)
+{
+	_outgoingMessages.push(msg + "\r\n");
 }
 
 void	Unibot::flushOutgoingMessages()
@@ -124,6 +175,66 @@ void	Unibot::flushOutgoingMessages()
 	}
 }
 
+bool	Unibot::login()
+{
+	// Envoi du PASS
+	sendMessage("PASS " + _password);
+
+	// Envoi du NICK (utilisons un nom simple pour commencer)
+	sendMessage("NICK unibot");
+
+	// Envoi du USER (hostname et realname peuvent être simples pour un bot)
+	sendMessage("USER unibot 0 * :Unibot IRC");
+
+	// On flush immédiatement pour envoyer la séquence de login
+	flushOutgoingMessages();
+
+	std::string response;
+	bool loggedIn = false;
+
+	// Attente de la réponse du serveur
+	while (!loggedIn && _running)
+	{
+		handleIncomingMessages();
+		while (!_incomingMessages.empty())
+		{
+			response = getLastMessage();
+			logMessage("Login Response: " + response, false);
+			int numeric = getNumericResponse(response);
+			if (numeric == 001) // RPL_WELCOME
+			{
+				loggedIn = true;
+				break;
+			}
+			else if (numeric == 433) // ERR_NICKNAMEINUSE
+			{
+				logMessage("Nickname already in use", false);
+			}
+		}
+	}
+
+	sendMessage("PING :unibot");
+	flushOutgoingMessages();
+
+	handleIncomingMessages();
+	while (!_incomingMessages.empty())
+	{
+		response = getLastMessage();
+		logMessage("Post-login Response: " + response, false);
+		// Message == :127.0.0.1 PONG 127.0.0.1 :unibot exact match
+		if (response == ":127.0.0.1 PONG 127.0.0.1 :unibot")
+		{
+			loggedIn = true;
+			break;
+		}
+
+	}
+
+	logMessage(loggedIn ? "Login successful" : "Login failed", !loggedIn);
+
+	return loggedIn;
+}
+
 void	Unibot::run()
 {
 	if (!connectServer())
@@ -133,12 +244,12 @@ void	Unibot::run()
 	}
 
 	logMessage("[DEBUG] Starting login sequence", false);
-	// if (!login())
-	// {
-	// 	logMessage("Login failed", true);
-	// 	disconnect();
-	// 	return;
-	// }
+	if (!login())
+	{
+		logMessage("Login failed", true);
+		disconnect();
+		return;
+	}
 
 	while (_running)
 	{

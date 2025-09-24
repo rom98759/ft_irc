@@ -30,6 +30,8 @@
 class Unibot
 {
 	private:
+		static Unibot* _instance;      // Instance pour le signal handler
+
 		std::string _password;
 		int _port;
 		int _fd;                      // socket
@@ -43,11 +45,17 @@ class Unibot
 		Unibot(const std::string &password, int port);
 		~Unibot();
 
+		static void SignalHandler(int signum);
+		void stop();
+
+
 		bool initSocket();            // créer socket, option non-bloquant
 		bool setupConnection();       // configurer la connexion
 		bool connectServer();         // connecter avec gestion EINPROGRESS
 		void disconnect();            // fermer socket proprement
 		void run();                   // boucle principale unique avec poll
+
+		std::string getLastMessage(); // obtenir le message le plus ancien
 
 		void logMessage(const std::string &msg, bool isError) const;
 
@@ -56,4 +64,7 @@ class Unibot
 		void handleIncomingMessages();    // lire messages, push dans _incomingMessages
 		void flushOutgoingMessages();     // envoyer messages depuis _outgoingMessages
 		void sendMessage(const std::string &msg); // push dans _outgoingMessages
+		bool login();                     // sequence de login IRC
 };
+
+int	getNumericResponse(const std::string& message); // extraire le code numérique d'une réponse IRC
