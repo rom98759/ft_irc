@@ -6,7 +6,7 @@
 /*   By: rcaillie <rcaillie@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/23 00:30:28 by kzhen-cl          #+#    #+#             */
-/*   Updated: 2025/09/24 12:51:59 by rcaillie         ###   ########.fr       */
+/*   Updated: 2025/09/24 13:12:50 by rcaillie         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -181,7 +181,7 @@ bool	Unibot::login()
 
 	// Envoi du USER
 	sendMessage("USER unibot 0 * :Unibot IRC");
-	
+
 	// Flush immédiatement
 	flushOutgoingMessages();
 
@@ -205,7 +205,13 @@ bool	Unibot::login()
 			{
 				std::string response = getLastMessage();
 				int numeric = getNumericResponse(response);
-				if (numeric == 001)
+				if (numeric == 464)
+				{ // ERR_PASSWDMISMATCH
+					logMessage("Password incorrect", true);
+					_running = false;
+					return false;
+				}
+				else if (numeric == 001)
 				{ // RPL_WELCOME
 					loggedIn = true;
 					break;
