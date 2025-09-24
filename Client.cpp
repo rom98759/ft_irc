@@ -24,7 +24,8 @@ Client::Client(const int &fd) : _fd(fd), _registerLevel(0)
 
 Client::~Client(void)
 {
-	close(_fd);
+	if (_fd >= 0)
+		close(_fd);
 }
 
 char	Client::operator+=(Channel *const ch)
@@ -98,7 +99,7 @@ bool Client::sendMessage(const std::string &message)
 {
 	if (message.empty())
 		return true;
-	ssize_t bytesSent = send(_fd, message.c_str(), message.length(), 0);
+	ssize_t bytesSent = send(_fd, message.c_str(), message.length(), MSG_NOSIGNAL);
 
 	// Erreur d'envoi
 	if (bytesSent < 0)
