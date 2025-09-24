@@ -45,10 +45,6 @@ class Unibot
 		Unibot(const std::string &password, int port);
 		~Unibot();
 
-		static void SignalHandler(int signum);
-		void stop();
-
-
 		bool initSocket();            // créer socket, option non-bloquant
 		bool setupConnection();       // configurer la connexion
 		bool connectServer();         // connecter avec gestion EINPROGRESS
@@ -65,6 +61,8 @@ class Unibot
 		void flushOutgoingMessages();     // envoyer messages depuis _outgoingMessages
 		void sendMessage(const std::string &msg); // push dans _outgoingMessages
 		bool login();                     // sequence de login IRC
+		bool joinGameChannel();          // rejoindre le channel #GAME
 };
 
 int	getNumericResponse(const std::string& message); // extraire le code numérique d'une réponse IRC
+static void SignalHandler(int signum);
