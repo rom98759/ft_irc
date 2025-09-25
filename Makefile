@@ -1,6 +1,6 @@
 NAME = ircserv
 
-NAME_BONUS = unibot^_^
+NAME_BONUS = Unibot^_^
 
 OBJDIR = obj/
 

@@ -11,11 +11,11 @@
 /* ************************************************************************** */
 
 #include "Unibot.hpp"
+#include <sys/time.h>
+#include <sstream>
 
-Unibot::Unibot(const std::string &password, int port)
-	: _password(password), _port(port), _fd(-1), _running(true)
-{
-}
+Unibot::Unibot(const std::string &password, int port, const std::string &channel, const std::string &key)
+	: _prefix("UB "), _password(password), _port(port), _currentChannel(channel), _key(key), _fd(-1), _running(true) {}
 
 Unibot::~Unibot()
 {
@@ -112,6 +112,8 @@ void	Unibot::handleIncomingMessages()
 	ssize_t bytesRead = recv(_fd, buffer, sizeof(buffer) - 1, 0);
 	if (bytesRead < 0)
 	{
+		if (errno == 11)
+			return ;
 		logMessage("Receive error: " + std::string(strerror(errno)), true);
 		_running = false;
 		return;
@@ -145,6 +147,11 @@ void	Unibot::handleIncomingMessages()
 void	Unibot::sendMessage(const std::string &msg)
 {
 	_outgoingMessages.push(msg + "\r\n");
+}
+
+void	Unibot::sendToChannel(const std::string &msg)
+{
+	sendMessage("PRIVMSG " + _currentChannel + " :" + msg);
 }
 
 void	Unibot::flushOutgoingMessages()
@@ -195,7 +202,7 @@ bool	Unibot::login()
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 1000); // 1 second timeout
+		int ret = poll(fds, 1, _timeout); // 5 second timeout
 		if (ret <= 0)
 			continue;
 		if (fds[0].revents & POLLIN)
@@ -211,7 +218,7 @@ bool	Unibot::login()
 					_running = false;
 					return false;
 				}
-				else if (numeric == 001)
+				else if (numeric == 004)
 				{ // RPL_WELCOME
 					loggedIn = true;
 					break;
@@ -239,66 +246,133 @@ bool	Unibot::login()
 	return true;
 }
 
-bool	Unibot::joinGameChannel()
+static inline long	now(void)
 {
-	sendMessage("JOIN #GAME");
+	struct timeval	tv;
+
+	gettimeofday(&tv, 0);
+	return ((tv.tv_sec * 1000L) + (tv.tv_usec / 1000L));
+}
+
+static char	contains(const std::vector<int> &err, int num)
+{
+	std::size_t	esize = err.size();
+	for (std::size_t i = 0; i < esize; ++i)
+		if (err[i] == num)
+			return (1);
+	return (0);
+}
+
+/*
+Use only after having sent message to get determine it was a success or not.
+	- if _timeout is reached, returns 0
+	- if err is found, returns 0
+	- if rpl is found, returns 1
+*/
+char	Unibot::recvUntilTimeoutOrError(int rpl, const std::vector<int> &err)
+{
+	const long			begin = now();
+
+	while (now() - begin < _timeout)
+	{
+		handleIncomingMessages();
+		if (!_incomingMessages.empty())
+		{
+			std::string	response = getLastMessage();
+			int			responseNum = getNumericResponse(response);
+			if (responseNum == rpl)
+				return (1);
+			if (contains(err, responseNum))
+				return (0);
+		}
+		usleep(100);
+	}
+	return (0);
+}
+
+bool	Unibot::joinChannel(const std::string &channel)
+{
+	sendMessage("JOIN " + channel + ' ' + _key);
 	flushOutgoingMessages();
 
-	bool joined = false;
-	int maxAttempts = 10;
-	int attempts = 0;
+	struct pollfd			fds[1];
 
-	while (!joined && _running && attempts < maxAttempts)
+	(*fds).fd = _fd;
+	(*fds).events = POLLIN;
+	const int				ret = poll(fds, 1, _timeout); // 5 seconds timeout
+	if (ret > 0 && ((*fds).revents & POLLIN))
 	{
-		attempts++;
-		struct pollfd fds[1];
-		fds[0].fd = _fd;
-		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 1000); // 1 second timeout
-		if (ret <= 0)
-			continue;
-		if (fds[0].revents & POLLIN)
+		static const int	errArray[5] = {403, 475, 471, 473, 476};
+		if (recvUntilTimeoutOrError(366, std::vector<int>(errArray, errArray + 5)))
 		{
-			handleIncomingMessages();
-			while (!_incomingMessages.empty())
-			{
-				std::string response = getLastMessage();
-				if (response.find("JOIN :#GAME") != std::string::npos)
-				{
-					logMessage("Successfully joined channel #GAME", false);
-					joined = true;
-					break;
-				}
-				else if (response.find("ERR_CANNOTJOIN") != std::string::npos)
-				{
-					logMessage("Cannot join channel #GAME", true);
-					break;
-				}
-			}
+			logMessage("Successfully joined channel " + channel, false);
+			_currentChannel = channel;
+			return (1);
 		}
 	}
 
-	if (!joined)
+	logMessage("Failed to join " + channel, true);
+	return false;
+}
+
+static inline const std::vector<std::string>	ft_splitSpaces(const std::string &cmd)
+{
+	std::vector<std::string>	tokens;
+	std::istringstream			iss(cmd);
+	std::string					token;
+
+	while (iss >> token)
+		tokens.push_back(token);
+	return (tokens);
+}
+
+void	Unibot::handleCommands(const std::string &message)
+{
+	std::cout << "Handling message: " << message << std::endl;
+	const std::string			target = " PRIVMSG " + _currentChannel + " :" + _prefix;
+	const std::size_t			pos = message.find(target);
+	if (pos == std::string::npos)
+		return ;
+	const std::string			cmd = message.substr(pos + target.size());
+	if (std::isspace(cmd[0]))
+		return ;
+	std::cout << "Command found: " << cmd << std::endl;
+
+	std::vector<std::string>	tokens = ft_splitSpaces(cmd);
+	if (tokens[0] == "prefix")
 	{
-		logMessage("Failed to join #GAME channel after multiple attempts", true);
-		return false;
+		if (tokens.size() != 2)
+		{
+			sendToChannel("<current_prefix>prefix: 1 parameter: <new_prefix>");
+			return ;
+		}
+		tokens[1] = cmd.substr(cmd.rfind(tokens[1]));
+		_prefix = tokens[1];
+		sendToChannel("prefix changed: [" + tokens[1] + "]");
 	}
-	return true;
+	else if (tokens[0] == "channel")
+	{
+		std::size_t	tsize = tokens.size();
+		if (tsize < 2 || tsize > 3)
+		{
+			sendToChannel("<prefix>channel: 1-2 parameters: <channel> [<key>]");
+			return ;
+		}
+		if (tokens[1] == _currentChannel)
+		{
+			sendToChannel("<prefix>channel: can't change to <current_channel>");
+			return ;
+		}
+		_key = (tsize == 3 ? tokens[2] : "");
+		std::string	oldChannel = _currentChannel;
+		if (joinChannel(tokens[1]))
+			sendMessage("PART " + oldChannel + " :channel changed: [" + _currentChannel + (tsize == 3 ? ("](" + tokens[2] + ")") : "]"));
+		else
+			sendToChannel("<prefix>channel: can't join " + tokens[1]);
+	}
 }
 
-void Unibot::handleCommands(const std::string &message) {
-	std::cout << "Handling command: " << message << std::endl;
-	if (message.find("!CACA") != std::string::npos) {
-		std::cout << "Received !CACA command" << std::endl;
-		sendMessage("PRIVMSG #GAME :PROUUUUUUT");
-	} else if (message.find("!PING") != std::string::npos) {
-		sendMessage("PRIVMSG #GAME :PONG");
-	} else if (message.find("!EXIT") != std::string::npos) {
-		_running = false;
-	}
-}
-
-void Unibot::run()
+void	Unibot::run()
 {
 	if (!connectServer())
 	{
@@ -311,9 +385,9 @@ void Unibot::run()
 		disconnect();
 		return;
 	}
-	if (!joinGameChannel())
+	fcntl(_fd, F_SETFL, O_NONBLOCK);
+	if (!joinChannel(_currentChannel))
 	{
-		logMessage("Failed to join #GAME channel", true);
 		disconnect();
 		return;
 	}
@@ -323,7 +397,7 @@ void Unibot::run()
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 5000); // 5 seconds timeout
+		int ret = poll(fds, 1, _timeout); // 5 seconds timeout
 		if (ret < 0)
 		{
 			logMessage("Poll error: " + std::string(strerror(errno)), true);
@@ -356,9 +430,9 @@ void	SignalHandler(int signum)
 
 int	main(int argc, char *argv[])
 {
-	if (argc != 3)
+	if (argc < 4 || argc > 5)
 	{
-		std::cerr << "Usage: ./Unibot <port> <password>" << std::endl;
+		std::cerr << "Usage: ./Unibot <port> <password> <channel> [<key>]" << std::endl;
 		return (1);
 	}
 	int port = atoi(argv[1]);
@@ -374,7 +448,7 @@ int	main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE crash send
 
 	// Initialize and run the bot
-	Unibot bot(argv[2], port);
+	Unibot bot(argv[2], port, *(argv + 3), (argc == 5 ? *(argv + 4) : ""));
 	bot.run();
 
 	return (0);
