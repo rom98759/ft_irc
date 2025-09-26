@@ -178,13 +178,13 @@ bool	Unibot::login()
 	oss << "unibot";
 	if (nickAttempt > 0)
 		oss << nickAttempt;
-	std::string nickname = oss.str();
+	_nick = oss.str();
 
 	// Envoi du PASS
 	sendMessage("PASS " + _password);
 
 	// Envoi du NICK
-	sendMessage("NICK " + nickname);
+	sendMessage("NICK " + _nick);
 
 	// Envoi du USER
 	sendMessage("USER unibot 0 * :Unibot IRC");
@@ -229,8 +229,8 @@ bool	Unibot::login()
 					nickAttempt++;
 					oss.str("");
 					oss << "unibot" << nickAttempt;
-					nickname = oss.str();
-					sendMessage("NICK " + nickname);
+					_nick = oss.str();
+					sendMessage("NICK " + _nick);
 					flushOutgoingMessages();
 				}
 			}
@@ -242,7 +242,7 @@ bool	Unibot::login()
 		logMessage("Login failed after multiple attempts", true);
 		return false;
 	}
-	logMessage("Login successful with nickname: " + nickname, false);
+	logMessage("Login successful with nickname: " + _nick, false);
 	return true;
 }
 
@@ -326,6 +326,155 @@ static inline const std::vector<std::string>	ft_splitSpaces(const std::string &c
 	return (tokens);
 }
 
+static inline std::string	getEventFromMessage(const std::string &msg)
+{
+	const std::size_t	lim = msg.find(':', 1);
+	return (lim == std::string::npos ? "" : msg.substr(1, lim - 1));
+}
+
+/*
+ID is <nick>!<username>@<IPaddr>
+*/
+static inline std::string	getNickFromID(const std::string &id)
+{
+	const std::size_t	lim = id.find('!');
+	return (lim == std::string::npos ? "" : id.substr(0, lim));
+}
+
+char	Unibot::handleEvents(const std::string &message)
+{
+	const std::string					event = getEventFromMessage(message);
+	if (event.empty())
+		return (0);
+
+	if (event.find(" KICK ") != std::string::npos)
+	{
+		const std::vector<std::string>	split = ft_splitSpaces(event);
+		const std::string				target = split.back();
+		if (target == _nick) // Bot is kicked : stops
+		{
+			_running = false;
+			return (1);
+		}
+		if (target == *_p) // First player is kicked
+		{
+			if (_game) // Game phase : Second player wins
+			{
+				++_game;
+				sendToChannel("[GAME] " + *_p + " was kicked. " + *(_p + 1) + " wins");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			else // Invitation phase : Invitation ends
+			{
+				_inviteStart = 0;
+				sendToChannel("[GAME INVITE] " + *_p + " was kicked. Invitation ends");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			return (1);
+		}
+		if (target == *(_p + 1) && _game) // Second player is kicked midgame : First player wins
+		{
+			++_game;
+			sendToChannel("[GAME] " + *(_p + 1) + " was kicked. " + *_p + " wins");
+			*_p = "";
+			*(_p + 1) = "";
+			return (1);
+		} // There is no invitation handling because someone can NICK and reply by 'y' or 'n'
+	}
+	else if (event.find(" NICK ") != std::string::npos)
+	{
+		const std::string				oldNick = getNickFromID(ft_splitSpaces(event)[0]);
+		const std::string				newNick = message.substr(event.size() + 2);
+		std::cout << newNick << std::endl;
+		if (oldNick == *_p)
+		{
+			*_p = newNick;
+			return (1);
+		}
+		if (oldNick == *(_p + 1))
+		{
+			*(_p + 1) = newNick;
+			return (1);
+		}
+	}
+	else if (event.find(" PART ") != std::string::npos || event.find(" QUIT ") != std::string::npos)
+	{
+		const std::string				client = getNickFromID(ft_splitSpaces(event)[0]);
+		if (client == *_p) // First player leaves
+		{
+			if (_game) // Game phase : Second player wins
+			{
+				++_game;
+				sendToChannel("[GAME] " + *_p + " left. " + *(_p + 1) + " wins");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			else // Invitation phase : Invitation ends
+			{
+				_inviteStart = 0;
+				sendToChannel("[GAME INVITE] " + *_p + " left. Invitation ends");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			return (1);
+		}
+		if (client == *(_p + 1) && _game) // Second player leaves midgame : First player wins
+		{
+			++_game;
+			sendToChannel("[GAME] " + *(_p + 1) + " left. " + *_p + " wins");
+			*_p = "";
+			*(_p + 1) = "";
+			return (1);
+		} // There is no invitation handling because someone can NICK and reply by 'y' or 'n'
+	}
+	return (0);
+}
+
+void	Unibot::playGame(const std::string &client, const std::vector<std::string> &tokens)
+{
+	(void) client;
+	(void) tokens;
+	sendToChannel("UNAVAILABLE");
+}
+
+void	Unibot::inviteGame(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>p: 1 parameter: <nick>"));
+	*_p = client;
+	*(_p + 1) = tokens.back();
+	if (_p->empty())
+		return (sendToChannel("[GAME INVITE] Unexpected error encountered"));
+	if (*_p == *(_p + 1))
+		return (sendToChannel("[GAME INVITE] You can't confront yourself"));
+	if (*(_p + 1) == _nick)
+		return (sendToChannel("[GAME INVITE CONFRONTING DEITY] I would eradicate your miserable life... Do not try me"));
+	sendToChannel(*_p + " challenges " + *(_p + 1) + " ! (<prefix>p [y|n])");
+	_inviteStart = now();
+}
+
+void	Unibot::replyGame(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (client != *(_p + 1))
+		return (sendToChannel("[GUY PRETENDING TO BE THE ONE CHALLENGED] Who are you?"));
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>p: 1 parameter: [y|n]"));
+	if (tokens[1] == "n")
+	{
+		_inviteStart = 0;
+		return (sendToChannel("[GAME REPLY] " + client + " declined"));
+	}
+	if (tokens[1] == "y")
+	{
+		_inviteStart = 0;
+		++_game;
+		return (sendToChannel("[GAME REPLY] " + client + " accepted"));
+	}
+	sendToChannel("<prefix>p [y|n]");
+}
+
 void	Unibot::handleCommands(const std::string &message)
 {
 	std::cout << "Handling message: " << message << std::endl;
@@ -339,36 +488,86 @@ void	Unibot::handleCommands(const std::string &message)
 	std::cout << "Command found: " << cmd << std::endl;
 
 	std::vector<std::string>	tokens = ft_splitSpaces(cmd);
+	if (tokens.empty())
+		return ;
 	if (tokens[0] == "prefix")
 	{
+		if (_game || _inviteStart)
+			return (sendToChannel("<prefix>prefix: game state: can't perform"));
 		if (tokens.size() != 2)
-		{
-			sendToChannel("<current_prefix>prefix: 1 parameter: <new_prefix>");
-			return ;
-		}
+			return (sendToChannel("<current_prefix>prefix: 1 parameter: <new_prefix>"));
 		tokens[1] = cmd.substr(cmd.rfind(tokens[1]));
 		_prefix = tokens[1];
 		sendToChannel("prefix changed: [" + tokens[1] + "]");
 	}
 	else if (tokens[0] == "channel")
 	{
+		if (_game || _inviteStart)
+			return (sendToChannel("<prefix>channel: game state: can't perform"));
 		std::size_t	tsize = tokens.size();
 		if (tsize < 2 || tsize > 3)
-		{
-			sendToChannel("<prefix>channel: 1-2 parameters: <channel> [<key>]");
-			return ;
-		}
+			return (sendToChannel("<prefix>channel: 1-2 parameters: <channel> [<key>]"));
 		if (tokens[1] == _currentChannel)
-		{
-			sendToChannel("<prefix>channel: can't change to <current_channel>");
-			return ;
-		}
+			return (sendToChannel("<prefix>channel: can't change to <current_channel>"));
 		_key = (tsize == 3 ? tokens[2] : "");
 		std::string	oldChannel = _currentChannel;
 		if (joinChannel(tokens[1]))
 			sendMessage("PART " + oldChannel + " :channel changed: [" + _currentChannel + (tsize == 3 ? ("](" + tokens[2] + ")") : "]"));
 		else
 			sendToChannel("<prefix>channel: can't join " + tokens[1]);
+	}
+	else if (tokens[0] == "p")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		if (_game)
+			playGame(client, tokens);
+		else if (!_game && !_inviteStart)
+			inviteGame(client, tokens);
+		else
+			replyGame(client, tokens);
+		if (!_game && !_inviteStart)
+		{
+			*_p = "";
+			*(_p + 1) = "";
+		}
+	}
+	else if (tokens[0] == "q")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		if (tokens.size() != 1)
+			return (sendToChannel("<prefix>q: no parameter"));
+		if (_game)
+		{
+			if (client == *_p) // First player forfeits
+			{
+				++_game;
+				sendToChannel("[GAME] " + *_p + " forfeits. " + *(_p + 1) + " wins");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			else if (client == *(_p + 1)) // Second player forfeits
+			{
+				++_game;
+				sendToChannel("[GAME] " + *(_p + 1) + " forfeits. " + *_p + " wins");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			return ;
+		}
+		if (_inviteStart)
+		{
+			if (client == *_p)
+			{
+				_inviteStart = 0;
+				sendToChannel("[GAME INVITE] " + *_p + " cancelled their request");
+				*_p = "";
+				*(_p + 1) = "";
+			}
+			else
+				sendToChannel("[GUY WHO DOES NOT OWN THE RIGHT TO CANCEL THIS REQUEST] Who are you?");
+			return ;
+		}
+		return (sendToChannel("<prefix>q: not in game state: can't perform"));
 	}
 }
 
@@ -392,6 +591,10 @@ void	Unibot::run()
 		return;
 	}
 	clearIncomingMessages();
+	*_p = "";
+	*(_p + 1) = "";
+	_game = 0;
+	_inviteStart = 0;
 	while (_running)
 	{
 		struct pollfd fds[1];
@@ -403,7 +606,14 @@ void	Unibot::run()
 			logMessage("Poll error: " + std::string(strerror(errno)), true);
 			break;
 		}
-		else if (ret == 0)
+		static const long	inviteTimeout = _timeout * 5;
+		if (_inviteStart && ((now() - _inviteStart) > inviteTimeout))
+		{
+			_inviteStart = 0;
+			sendToChannel("Match request timeout");
+			flushOutgoingMessages();
+		}
+		if (ret == 0)
 		{
 			// Timeout, no data received
 			continue;
@@ -415,7 +625,10 @@ void	Unibot::run()
 			while (!_incomingMessages.empty())
 			{
 				std::string msg = getLastMessage();
-				handleCommands(msg);
+				if (!handleEvents(msg))
+					handleCommands(msg);
+				if (!_running)
+					return (disconnect());
 			}
 		}
 		flushOutgoingMessages();

@@ -41,9 +41,14 @@ class Unibot
 		int						_fd;                                                             // socket
 		struct sockaddr_in		_serv_addr;
 		bool					_running;
+		std::string				_nick;
 
 		std::queue<std::string> _incomingMessages;                                               // queue des messages reçus
 		std::queue<std::string> _outgoingMessages;                                               // queue des messages à envoyer
+
+		std::string				_p[2];
+		char					_game : 1;
+		long					_inviteStart;
 
 	public:
 		Unibot(const std::string &password, int port, const std::string &channel, const std::string &key);
@@ -63,6 +68,7 @@ class Unibot
 	private:
 		void					handleIncomingMessages();                                        // lire messages, push dans _incomingMessages
 		void					flushOutgoingMessages();                                         // envoyer messages depuis _outgoingMessages
+		char					handleEvents(const std::string &message);                        // gérer les événements (KICK, Client PART/NICK etc.);
 		void					handleCommands(const std::string &message);                      // gérer les commandes spécifiques
 		void					sendMessage(const std::string &msg);                             // push dans _outgoingMessages
 		void					sendToChannel(const std::string &msg);                           // formatte pour envoyer directement dans le canal
@@ -71,6 +77,10 @@ class Unibot
 
 		void					clearIncomingMessages() { while (!_incomingMessages.empty()) _incomingMessages.pop(); }
 		char					recvUntilTimeoutOrError(int rpl, const std::vector<int> &err = std::vector<int>());
+
+		void					playGame(const std::string &client, const std::vector<std::string> &tokens);
+		void					inviteGame(const std::string &client, const std::vector<std::string> &tokens);
+		void					replyGame(const std::string &client, const std::vector<std::string> &tokens);
 };
 
 int			getNumericResponse(const std::string& message); // extraire le code numérique d'une réponse IRC
