@@ -58,4 +58,4 @@ re: fclean all
 
 .PHONY: all clean fclean re bonus
 
--include $(DEP)
+-include $(DEP) $(DEP_BONUS)

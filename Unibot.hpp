@@ -27,8 +27,27 @@
 #include <fcntl.h>
 #include <poll.h>
 
-class Unibot
+class	Unibot
 {
+	private: /* -Tic Tac Toe- */
+		class	X3T // x3 T => TTT => Tic Tac Toe
+		{
+			private:
+				char						_table[9];
+			public: /* -Constructor- */
+				X3T(void);
+			public: /* -Getters/Predicate Methods- */
+				std::vector<std::string>	getFormattedTable(void) const;
+				char						isWin(void) const;
+				char						isFull(void) const;
+				char						isPlayable(const char &index) const;
+			public: /* -Setters- */
+				void						play(const char &sign, const char &index);
+				void						fillTable(const char &sign);
+		};
+		X3T						_x3t[10];
+		void					reportX3T(const Unibot::X3T *const x3t);
+
 	private:
 		static const int		_timeout = 5000;
 		static Unibot*			_instance;                                                       // Instance pour le signal handler
@@ -47,7 +66,9 @@ class Unibot
 		std::queue<std::string> _outgoingMessages;                                               // queue des messages à envoyer
 
 		std::string				_p[2];
-		char					_game : 1;
+		static const char		_sign[2];
+		unsigned char			_game : 1;
+		unsigned char			_turn : 1;
 		long					_inviteStart;
 
 	public:
@@ -77,6 +98,10 @@ class Unibot
 
 		void					clearIncomingMessages() { while (!_incomingMessages.empty()) _incomingMessages.pop(); }
 		char					recvUntilTimeoutOrError(int rpl, const std::vector<int> &err = std::vector<int>());
+
+		void					resetPlayers(void);
+		void					resetGame(void);
+		void					resetInvite(void);
 
 		void					playGame(const std::string &client, const std::vector<std::string> &tokens);
 		void					inviteGame(const std::string &client, const std::vector<std::string> &tokens);
