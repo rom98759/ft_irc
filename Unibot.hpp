@@ -46,7 +46,7 @@ class	Unibot
 				void						fillTable(const char &sign);
 		};
 		X3T						_x3t[10];
-		void					reportX3T(const Unibot::X3T *const x3t);
+		void					reportX3T(void);
 
 	private:
 		static const int		_timeout = 5000;
@@ -68,7 +68,9 @@ class	Unibot
 		std::string				_p[2];
 		static const char		_sign[2];
 		unsigned char			_game : 1;
+		unsigned char			_gm : 2;
 		unsigned char			_turn : 1;
+		unsigned char			_forcedMove : 4;
 		long					_inviteStart;
 
 	public:
@@ -103,7 +105,8 @@ class	Unibot
 		void					resetGame(void);
 		void					resetInvite(void);
 
-		void					playGame(const std::string &client, const std::vector<std::string> &tokens);
+		void					playGameBasic(const std::string &client, const std::vector<std::string> &tokens);
+		void					playGameBidimensional(const std::string &client, const std::vector<std::string> &tokens);
 		void					inviteGame(const std::string &client, const std::vector<std::string> &tokens);
 		void					replyGame(const std::string &client, const std::vector<std::string> &tokens);
 };

@@ -507,13 +507,27 @@ char	Unibot::handleEvents(const std::string &message)
 	return (0);
 }
 
-void	Unibot::reportX3T(const Unibot::X3T *const x3t)
+void	Unibot::reportX3T(void)
 {
-	const std::vector<std::string>	table = x3t->getFormattedTable();
 	sendToChannel("[GAME] " + *(_p + _turn) + "'s turn");
-	sendToChannel(table[0]);
-	sendToChannel(table[1]);
-	sendToChannel(table[2]);
+	if (_gm == 1)
+	{
+		const std::vector<std::string>	table = _x3t->getFormattedTable();
+		sendToChannel(table[0]);
+		sendToChannel(table[1]);
+		sendToChannel(table[2]);
+		return ;
+	}
+	for (char i = 0; i < 3; ++i)
+	{
+		const char						step = i * 3;
+		const std::vector<std::string>	table[3] = {(_x3t + step)->getFormattedTable(), (_x3t + step + 1)->getFormattedTable(), (_x3t + step + 2)->getFormattedTable()};
+		sendToChannel(table[0][0] + "  " + table[1][0] + "  " + table[2][0]);
+		sendToChannel(table[0][1] + "  " + table[1][1] + "  " + table[2][1]);
+		sendToChannel(table[0][2] + "  " + table[1][2] + "  " + table[2][2]);
+		if (i < 2)
+			sendToChannel("");
+	}
 }
 
 static inline char	answerToInt(const char &answer)
@@ -521,7 +535,7 @@ static inline char	answerToInt(const char &answer)
 	return (answer >= '1' && answer <= '9' ? answer - '1' : -1);
 }
 
-void	Unibot::playGame(const std::string &client, const std::vector<std::string> &tokens)
+void	Unibot::playGameBasic(const std::string &client, const std::vector<std::string> &tokens)
 {
 	if (client != *(_p + _turn))
 		return ;
@@ -532,26 +546,89 @@ void	Unibot::playGame(const std::string &client, const std::vector<std::string> 
 	if (answer.size() > 1 || index < 0)
 		return (sendToChannel("<prefix>p: invalid index"));
 	if (!_x3t->isPlayable(index))
-		return (sendToChannel("[GAME] Can't play this"));
+		return (sendToChannel("[GAME] Can't play this, case already filled"));
 	_x3t->play(*(_sign + _turn), index);
-	++_turn;
-	reportX3T(_x3t);
 	if (_x3t->isWin())
 	{
-		sendToChannel("[GAME OVER] " + *(_p + --_turn) + " wins");
-		resetGame();
+		reportX3T();
+		sendToChannel("[GAME OVER] " + *(_p + _turn) + " wins");
+		return (resetGame());
 	}
 	else if (_x3t->isFull())
 	{
+		reportX3T();
 		sendToChannel("[GAME OVER] No one wins");
-		resetGame();
+		return (resetGame());
 	}
+	++_turn;
+	reportX3T();
+}
+
+void	Unibot::playGameBidimensional(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (client != *(_p + _turn))
+		return ;
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>p: 1 parameter: <pos> = two indexes (example : 16 is the sixth slot of the first field)"));
+	const std::string	answer = tokens[1];
+	if (answer.size() != 2)
+		return (sendToChannel("<prefix>p: invalid pos"));
+	const char			i0 = answerToInt(answer[0]);
+	const char			i1 = answerToInt(answer[1]);
+	if (i0 < 0 || i1 < 0)
+		return (sendToChannel("<prefix>p: invalid pos"));
+	if (_forcedMove < 9 && i0 != _forcedMove)
+		return (sendToChannel("[GAME] Can't play this, you are forced to play in " + std::string(1, (_forcedMove + 1 + '0'))));
+	Unibot::X3T *const	field = _x3t + i0;
+	const char			sign = *(_sign + _turn);
+	if (!field->isPlayable(i1))
+		return (sendToChannel("[GAME] Can't play this, case already filled"));
+	field->play(sign, i1);
+	if (field->isWin())
+	{
+		if (_gm == 2) // Simple bidimensional Win Condition
+		{
+			reportX3T();
+			sendToChannel("[GAME OVER] " + *(_p + _turn) + " wins");
+			return (resetGame());
+		}
+		field->fillTable(sign);
+		(_x3t + 9)->play(sign, i0);
+	}
+	else if (field->isFull())
+		(_x3t + 9)->play(i0, i0);
+	++_turn;
+	reportX3T();
+	if ((_x3t + 9)->isWin()) // Extreme Bidimensional Win Condition
+	{
+		sendToChannel("[GAME OVER] " + *(_p + --_turn) + " wins");
+		return (resetGame());
+	}
+	else if ((_x3t + 9)->isFull()) // Both Modes Draw Condition
+	{
+		sendToChannel("[GAME OVER] No one wins");
+		return (resetGame());
+	}
+	// Force Next Move
+	if ((_x3t + 9)->isPlayable(i1))
+		_forcedMove = i1;
+	else
+		_forcedMove = -1;
 }
 
 void	Unibot::inviteGame(const std::string &client, const std::vector<std::string> &tokens)
 {
-	if (tokens.size() != 2)
-		return (sendToChannel("<prefix>p: 1 parameter: <nick>"));
+	const std::size_t	tsize = tokens.size();
+	if (tsize < 2 || tsize > 3)
+		return (sendToChannel("<prefix>p: 1-2 parameter: [<gamemode{1|2|e}>] <nick>"));
+	if (tsize == 2 || tokens[1] == "1")
+		_gm = 1;
+	else if (tokens[1] == "2")
+		_gm = 2;
+	else if (tokens[1] == "e")
+		_gm = 3;
+	else
+		return (sendToChannel("<prefix>p: invalid gamemode: [<gamemode{1|2|e}>]"));
 	*_p = client;
 	*(_p + 1) = tokens.back();
 	if (_p->empty())
@@ -560,16 +637,23 @@ void	Unibot::inviteGame(const std::string &client, const std::vector<std::string
 		return (sendToChannel("[GAME INVITE] You can't confront yourself"));
 	if (*(_p + 1) == _nick)
 		return (sendToChannel("[GAME INVITE CONFRONTING DEITY] I would eradicate your miserable life... Do not try me"));
-	sendToChannel(*_p + " challenges " + *(_p + 1) + " ! (<prefix>p [y|n])");
+	std::string			gamemode;
+	if (_gm == 1)
+		gamemode = "basic";
+	else if (_gm == 2)
+		gamemode = "bidimensional";
+	else
+		gamemode = "bidimensional (extreme)";
+	sendToChannel(*_p + " challenges " + *(_p + 1) + " in a " + gamemode + " set ! (<prefix>p <answer{y|n}>)");
 	_inviteStart = now();
 }
 
 void	Unibot::replyGame(const std::string &client, const std::vector<std::string> &tokens)
 {
 	if (client != *(_p + 1))
-		return (sendToChannel("[GUY PRETENDING TO BE THE ONE CHALLENGED] Who are you?"));
+		return ;
 	if (tokens.size() != 2)
-		return (sendToChannel("<prefix>p: 1 parameter: [y|n]"));
+		return (sendToChannel("<prefix>p: 1 parameter: <answer{y|n}>"));
 	if (tokens[1] == "n")
 	{
 		_inviteStart = 0;
@@ -581,10 +665,14 @@ void	Unibot::replyGame(const std::string &client, const std::vector<std::string>
 		++_game;
 		_turn = 0;
 		_x3t->fillTable('.');
+		_forcedMove = -1;
+		if (_gm > 1)
+			for (char i = 1; i < 10; ++i)
+				(_x3t + i)->fillTable('.');
 		sendToChannel("[GAME REPLY] " + client + " accepted");
-		return (reportX3T(_x3t));
+		return (reportX3T());
 	}
-	sendToChannel("<prefix>p [y|n]");
+	sendToChannel("<prefix>p <answer{y|n}>");
 }
 
 void	Unibot::handleCommands(const std::string &message)
@@ -632,7 +720,11 @@ void	Unibot::handleCommands(const std::string &message)
 	{
 		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
 		if (_game)
-			playGame(client, tokens);
+		{	if (_gm == 1)
+				playGameBasic(client, tokens);
+			else
+				playGameBidimensional(client, tokens);
+		}
 		else if (!_game && !_inviteStart)
 			inviteGame(client, tokens);
 		else
