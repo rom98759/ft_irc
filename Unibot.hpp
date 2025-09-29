@@ -95,6 +95,7 @@ class	Unibot
 		void					handleCommands(const std::string &message);                      // gérer les commandes spécifiques
 		void					sendMessage(const std::string &msg);                             // push dans _outgoingMessages
 		void					sendToChannel(const std::string &msg);                           // formatte pour envoyer directement dans le canal
+		void					sendToClient(const std::string &client, const std::string &msg); // formatte pour envoyer directement à un utilisateur
 		bool					login();                                                         // sequence de login IRC
 		bool					joinChannel(const std::string &channel);                         // rejoindre le channel #GAME
 
