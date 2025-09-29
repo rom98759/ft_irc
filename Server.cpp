@@ -222,7 +222,8 @@ bool	Server::initServer(void)
 // Fonction utilitaire pour formater les messages de réponse selon RFC
 inline std::string formatMessage(const std::string &code, const std::string &target, const std::string &message)
 {
-	std::string source = ":" + std::string("127.0.0.1"); // Nom de votre serveur
+	std::string serverIP = Server::getInstance() ? Server::getInstance()->getServerIP() : "127.0.0.1";
+	std::string source = ":" + serverIP;
 	return (source + " " + code + " " + target + " :" + message + "\r\n");
 }
 
@@ -287,6 +288,9 @@ bool	Server::bindAndListen(void)
 		close(_fd);
 		return false;
 	}
+
+	// IP locale serveur
+	_serverIP = "127.0.0.1";
 
 	return true;
 }
@@ -500,6 +504,9 @@ Client	*Server::createClient(int client_fd, struct sockaddr_in &client_addr)
 		// Convertir adresse IP en chaîne
 		inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
 
+		// Stocker l'IP du client
+		tmp->setIpAddress(std::string(ip_str));
+
 		std::cout << "New client connected from " << ip_str << ":"
 			<< ntohs(client_addr.sin_port) << ", fd=" << client_fd << std::endl;
 		// ntohs(client_addr.sin_port) = recuperer adresse:port
@@ -610,6 +617,7 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 	// Sauvegarder les informations du client avant modification
 	bool isRegistered = client->isRegistered();
 	std::string nickname = isRegistered ? client->getNick() : "";
+	std::string ipAddress = client->getIpAddress();
 
 	// Envoyer le message de déconnexion AVANT de supprimer le client
 	if (isRegistered)
@@ -619,7 +627,7 @@ void Server::disconnectClient(Client *client, const std::string &reason)
 		{
 			if (*(chans + i) != NULL)
 			{
-				(*(chans + i))->mall(":" + client->getNick() + "!" + client->getUsername() + "@127.0.0.1 QUIT " + (*(chans + i))->getName() + " :" + reason + "\r\n");
+				(*(chans + i))->mall(":" + client->getNick() + "!" + client->getUsername() + "@" + ipAddress + " QUIT " + (*(chans + i))->getName() + " :" + reason + "\r\n");
 				**(chans + i) -= client;
 			}
 		}

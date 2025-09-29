@@ -99,10 +99,11 @@ static const std::vector<std::string>	ft_split(const std::string &str, const cha
 static inline void	welcome(Client *const cl)
 {
 	const std::string	&nick = cl->getNick();
+	const std::string	&serverIP = Server::getInstance()->getServerIP();
 
 	cl->sendMessage(formatMessage(RPL_WELCOME, nick, "Welcome to the IRC Network, " + nick));
-	cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is 127.0.0.1, running version 1.0"));
-	cl->sendMessage(formatMessage(RPL_MYINFO, nick, "127.0.0.1 1.0 o o"));
+	cl->sendMessage(formatMessage(RPL_YOURHOST, nick, "Your host is " + serverIP + ", running version 1.0"));
+	cl->sendMessage(formatMessage(RPL_MYINFO, nick, serverIP + " 1.0 o o"));
 }
 
 /* **************************** |EVENTS/COMMANDS| **************************** */
@@ -199,7 +200,7 @@ char	Server::nick(Client *const cl, const std::vector<std::string> &tokens)
 	// Si changement de pseudo
 	else if (!isNewNick)
 	{
-		std::string nickChangeMsg = ":" + oldNick + "!" + cl->getUsername() + "@127.0.0.1 NICK :" + nick + "\r\n";
+		std::string nickChangeMsg = ":" + oldNick + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " NICK :" + nick + "\r\n";
 		mall(nickChangeMsg);
 	}
 
@@ -317,7 +318,7 @@ char	Server::ping(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	// PING -> PONG
-	cl->sendMessage(formatMessage("PONG", "127.0.0.1", tokens.at(1)));
+	cl->sendMessage(formatMessage("PONG", Server::getInstance()->getServerIP(), tokens.at(1)));
 	return (1);
 }
 
@@ -412,7 +413,7 @@ char	Server::join(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		*targetChan += cl;
 
-		std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 JOIN :" + targetChan->getName() + "\r\n";
+		std::string joinMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " JOIN :" + targetChan->getName() + "\r\n";
 		targetChan->mall(joinMsg);
 
 		cl->sendMessage(formatMessage("332", cl->getNick(), targetChan->getName() + " :Welcome to " + targetChan->getName()));
@@ -464,7 +465,7 @@ char	Server::part(Client *const cl, const std::vector<std::string> &tokens)
 		}
 		if (*cl -= targetChan)
 		{
-			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PART " + chans[i] + " :" + (tsize > 2 ? tokens[2] : "Leaving") + "\r\n";
+			std::string partMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " PART " + chans[i] + " :" + (tsize > 2 ? tokens[2] : "Leaving") + "\r\n";
 			targetChan->mall(partMsg);
 			*targetChan -= cl;
 		}
@@ -562,7 +563,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 			for (std::size_t j = 0; j < lsize; ++j)
 			{
 				if (chanList[j].first != cl)
-					chanList[j].first->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
+					chanList[j].first->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
 			}
 			continue;
 		}
@@ -572,7 +573,7 @@ char	Server::privmsg(Client *const cl, const std::vector<std::string> &tokens)
 		{
 			if (_clients[j]->getNick() == currentTarget && _clients[j]->isRegistered())
 			{
-				_clients[j]->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 PRIVMSG " + currentTarget + " :" + message + "\r\n");
+				_clients[j]->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " PRIVMSG " + currentTarget + " :" + message + "\r\n");
 				found = true;
 				break;
 			}
@@ -655,7 +656,7 @@ char	Server::topic(Client *const cl, const std::vector<std::string> &tokens)
 	chan->setTopic(newTopic);
 
 	// mall topic
-	std::string topicMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 TOPIC " + channelName + " :" + newTopic + "\r\n";
+	std::string topicMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " TOPIC " + channelName + " :" + newTopic + "\r\n";
 	chan->mall(topicMsg);
 
 	return (1);
@@ -823,7 +824,7 @@ char	Server::mode(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	// Notifier le changement de mode
-	std::string modeMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 MODE " + channelName + " " + modeStr;
+	std::string modeMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " MODE " + channelName + " " + modeStr;
 	if (paramIndex > 3)
 	{
 		for (size_t i = 3; i < paramIndex && i < tokens.size(); ++i)
@@ -894,7 +895,7 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 	}
 
 	// Effectuer le kick
-	std::string kickMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 KICK " + channelName + " " + kickNick + " :" + reason + "\r\n";
+	std::string kickMsg = ":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " KICK " + channelName + " " + kickNick + " :" + reason + "\r\n";
 	chan->mall(kickMsg);
 
 	// Retirer l'utilisateur du canal
@@ -941,7 +942,7 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 
 			// Format: RPL_WHOREPLY
 			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
-				mask + " " + user->getUsername() + " 127.0.0.1 " +
+				mask + " " + user->getUsername() + " " + user->getIpAddress() + " " +
 				user->getNick() + " " + op + " :0 " + user->getRealname()));
 		}
 	}
@@ -952,7 +953,7 @@ char	Server::who(Client *const cl, const std::vector<std::string> &tokens)
 		if (user && user->isRegistered())
 		{
 			cl->sendMessage(formatMessage(RPL_WHOREPLY, target,
-				"* " + user->getUsername() + " 127.0.0.1 " +
+				"* " + user->getUsername() + " " + user->getIpAddress() + " " +
 				user->getNick() + " :0 " + user->getRealname()));
 		}
 	}
@@ -1026,7 +1027,7 @@ char	Server::invite(Client *const cl, const std::vector<std::string> &tokens)
 	chan->addInvitation(targetUser);
 
 	// Envoyer l'invitation à l'utilisateur cible
-	targetUser->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@127.0.0.1 INVITE " + targetNick + " :" + channelName + "\r\n");
+	targetUser->sendMessage(":" + cl->getNick() + "!" + cl->getUsername() + "@" + cl->getIpAddress() + " INVITE " + targetNick + " :" + channelName + "\r\n");
 
 	// Confirmer l'invitation à celui qui invite
 	cl->sendMessage(formatMessage(RPL_INVITING, target, targetNick + " " + channelName));

@@ -46,6 +46,7 @@ class	Server
 		const unsigned short			_port;
 		const std::string				_pw;
 		int								_fd;
+		std::string						_serverIP;  // IP du serveur
 		std::vector<Client *>			_clients;
 		static Server*					_instance;
 		static bool						_running;
@@ -116,6 +117,7 @@ class	Server
 		const unsigned short			&getPort(void) const { return (_port); };
 		const std::string				&getPw(void) const { return (_pw); };
 		const int						&getFd(void) const { return (_fd); };
+		const std::string				&getServerIP(void) const { return (_serverIP); };
 		const std::vector<Client *>		&getClients(void) const { return (_clients); };
 		static Server *const			&getInstance(void) { return (_instance); };
 		static const bool				&isRunning(void) { return (_running); };

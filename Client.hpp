@@ -40,6 +40,7 @@ class	Client
 		std::string						_username;
 		std::string						_realname;
 		std::string						_buffer;            // Buffer stocker données reçues
+		std::string						_ipAddress;         // Adresse IP du client
 		unsigned char					_registerLevel : 2; // Etat d'enregistrement du client
 		Channel							*_channels[CHPERCL];
 
@@ -52,6 +53,7 @@ class	Client
 		const std::string				&getUsername(void) const { return (_username); };
 		const std::string				&getRealname(void) const { return (_realname); };
 		const std::string				&getBuffer(void) const { return (_buffer); };
+		const std::string				&getIpAddress(void) const { return (_ipAddress); };
 		bool							isRegistered(void) const { return (!(_registerLevel ^ 0b11)); };
 		unsigned char					getRegisterLevel(void) const { return (_registerLevel); };
 		Channel							**getChannels(void) const { return ((Channel **)_channels); };
@@ -59,6 +61,7 @@ class	Client
 		void							setNick(const std::string &nick) { _nick = nick; };
 		void							setUsername(const std::string &username) { _username = username; };
 		void							setRealname(const std::string &realname) { _realname = realname; };
+		void							setIpAddress(const std::string &ipAddress) { _ipAddress = ipAddress; };
 		void							upRegisterLevel(void) { ++_registerLevel; };
 	public: /* -Operators- */
 		char							operator+=(Channel *const ch);
