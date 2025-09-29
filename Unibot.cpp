@@ -11,11 +11,80 @@
 /* ************************************************************************** */
 
 #include "Unibot.hpp"
+#include <sys/time.h>
+#include <sstream>
 
-Unibot::Unibot(const std::string &password, int port)
-	: _password(password), _port(port), _fd(-1), _running(true)
+const char	Unibot::_sign[2] = {'X', 'O'};
+
+Unibot::X3T::X3T(void)
 {
+	*_table = '.';
+	*(_table + 1) = '.';
+	*(_table + 2) = '.';
+	*(_table + 3) = '.';
+	*(_table + 4) = '.';
+	*(_table + 5) = '.';
+	*(_table + 6) = '.';
+	*(_table + 7) = '.';
+	*(_table + 8) = '.';
 }
+
+std::vector<std::string>	Unibot::X3T::getFormattedTable(void) const
+{
+	std::vector<std::string>	format;
+	format.push_back(std::string(1, *_table) + ' ' + *(_table + 1) + ' ' + *(_table + 2));
+	format.push_back(std::string(1, *(_table + 3)) + ' ' + *(_table + 4) + ' ' + *(_table + 5));
+	format.push_back(std::string(1, *(_table + 6)) + ' ' + *(_table + 7) + ' ' + *(_table + 8));
+	return (format);
+}
+
+char	Unibot::X3T::isWin(void) const
+{
+	static const char	winCombo[24] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 4, 8, 2, 4, 6, 0, 3, 6, 1, 4, 7, 2, 5, 8};
+
+	for (char i = 0; i < 8; ++i)
+	{
+		const char	step = i * 3;
+		const char	s0 = *(_table + *(winCombo + step));
+		if (s0 != '.' && s0 == *(_table + *(winCombo + step + 1)) && s0 == *(_table + *(winCombo + step + 2)))
+			return (s0);
+	}
+	return (0);
+}
+
+inline char	Unibot::X3T::isFull(void) const
+{
+	for (char i = 0; i < 9; ++i)
+		if (*(_table + i) == '.')
+			return (0);
+	return (1);
+}
+
+char	Unibot::X3T::isPlayable(const char &index) const
+{
+	return (*(_table + index) == '.');
+}
+
+void	Unibot::X3T::play(const char &sign, const char &index)
+{
+	*(_table + index) = sign;
+}
+
+void	Unibot::X3T::fillTable(const char &sign)
+{
+	*_table = sign;
+	*(_table + 1) = sign;
+	*(_table + 2) = sign;
+	*(_table + 3) = sign;
+	*(_table + 4) = sign;
+	*(_table + 5) = sign;
+	*(_table + 6) = sign;
+	*(_table + 7) = sign;
+	*(_table + 8) = sign;
+}
+
+Unibot::Unibot(const std::string &password, int port, const std::string &channel, const std::string &key)
+	: _prefix("."), _password(password), _port(port), _currentChannel(channel), _key(key), _fd(-1), _running(true) {}
 
 Unibot::~Unibot()
 {
@@ -112,6 +181,8 @@ void	Unibot::handleIncomingMessages()
 	ssize_t bytesRead = recv(_fd, buffer, sizeof(buffer) - 1, 0);
 	if (bytesRead < 0)
 	{
+		if (errno == 11)
+			return ;
 		logMessage("Receive error: " + std::string(strerror(errno)), true);
 		_running = false;
 		return;
@@ -147,6 +218,16 @@ void	Unibot::sendMessage(const std::string &msg)
 	_outgoingMessages.push(msg + "\r\n");
 }
 
+void	Unibot::sendToChannel(const std::string &msg)
+{
+	sendMessage("PRIVMSG " + _currentChannel + " :" + msg);
+}
+
+void	Unibot::sendToClient(const std::string &client, const std::string &msg)
+{
+	sendMessage("PRIVMSG " + client + " :" + msg);
+}
+
 void	Unibot::flushOutgoingMessages()
 {
 	while (!_outgoingMessages.empty())
@@ -171,13 +252,13 @@ bool	Unibot::login()
 	oss << "unibot";
 	if (nickAttempt > 0)
 		oss << nickAttempt;
-	std::string nickname = oss.str();
+	_nick = oss.str();
 
 	// Envoi du PASS
 	sendMessage("PASS " + _password);
 
 	// Envoi du NICK
-	sendMessage("NICK " + nickname);
+	sendMessage("NICK " + _nick);
 
 	// Envoi du USER
 	sendMessage("USER unibot 0 * :Unibot IRC");
@@ -195,7 +276,7 @@ bool	Unibot::login()
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 1000); // 1 second timeout
+		int ret = poll(fds, 1, _timeout); // 5 second timeout
 		if (ret <= 0)
 			continue;
 		if (fds[0].revents & POLLIN)
@@ -211,7 +292,7 @@ bool	Unibot::login()
 					_running = false;
 					return false;
 				}
-				else if (numeric == 001)
+				else if (numeric == 004)
 				{ // RPL_WELCOME
 					loggedIn = true;
 					break;
@@ -222,8 +303,8 @@ bool	Unibot::login()
 					nickAttempt++;
 					oss.str("");
 					oss << "unibot" << nickAttempt;
-					nickname = oss.str();
-					sendMessage("NICK " + nickname);
+					_nick = oss.str();
+					sendMessage("NICK " + _nick);
 					flushOutgoingMessages();
 				}
 			}
@@ -235,70 +316,531 @@ bool	Unibot::login()
 		logMessage("Login failed after multiple attempts", true);
 		return false;
 	}
-	logMessage("Login successful with nickname: " + nickname, false);
+	logMessage("Login successful with nickname: " + _nick, false);
 	return true;
 }
 
-bool	Unibot::joinGameChannel()
+static inline long	now(void)
 {
-	sendMessage("JOIN #GAME");
+	struct timeval	tv;
+
+	gettimeofday(&tv, 0);
+	return ((tv.tv_sec * 1000L) + (tv.tv_usec / 1000L));
+}
+
+static char	contains(const std::vector<int> &err, int num)
+{
+	std::size_t	esize = err.size();
+	for (std::size_t i = 0; i < esize; ++i)
+		if (err[i] == num)
+			return (1);
+	return (0);
+}
+
+/*
+Use only after having sent message to get determine it was a success or not.
+	- if _timeout is reached, returns 0
+	- if err is found, returns 0
+	- if rpl is found, returns 1
+*/
+char	Unibot::recvUntilTimeoutOrError(int rpl, const std::vector<int> &err)
+{
+	const long			begin = now();
+
+	while (now() - begin < _timeout)
+	{
+		handleIncomingMessages();
+		if (!_incomingMessages.empty())
+		{
+			std::string	response = getLastMessage();
+			int			responseNum = getNumericResponse(response);
+			if (responseNum == rpl)
+				return (1);
+			if (contains(err, responseNum))
+				return (0);
+		}
+		usleep(100);
+	}
+	return (0);
+}
+
+bool	Unibot::joinChannel(const std::string &channel)
+{
+	sendMessage("JOIN " + channel + ' ' + _key);
 	flushOutgoingMessages();
 
-	bool joined = false;
-	int maxAttempts = 10;
-	int attempts = 0;
+	struct pollfd			fds[1];
 
-	while (!joined && _running && attempts < maxAttempts)
+	(*fds).fd = _fd;
+	(*fds).events = POLLIN;
+	const int				ret = poll(fds, 1, _timeout); // 5 seconds timeout
+	if (ret > 0 && ((*fds).revents & POLLIN))
 	{
-		attempts++;
-		struct pollfd fds[1];
-		fds[0].fd = _fd;
-		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 1000); // 1 second timeout
-		if (ret <= 0)
-			continue;
-		if (fds[0].revents & POLLIN)
+		static const int	errArray[5] = {403, 475, 471, 473, 476};
+		if (recvUntilTimeoutOrError(366, std::vector<int>(errArray, errArray + 5)))
 		{
-			handleIncomingMessages();
-			while (!_incomingMessages.empty())
-			{
-				std::string response = getLastMessage();
-				if (response.find("JOIN :#GAME") != std::string::npos)
-				{
-					logMessage("Successfully joined channel #GAME", false);
-					joined = true;
-					break;
-				}
-				else if (response.find("ERR_CANNOTJOIN") != std::string::npos)
-				{
-					logMessage("Cannot join channel #GAME", true);
-					break;
-				}
-			}
+			logMessage("Successfully joined channel " + channel, false);
+			_currentChannel = channel;
+			return (1);
 		}
 	}
 
-	if (!joined)
+	logMessage("Failed to join " + channel, true);
+	return false;
+}
+
+static inline const std::vector<std::string>	ft_splitSpaces(const std::string &cmd)
+{
+	std::vector<std::string>	tokens;
+	std::istringstream			iss(cmd);
+	std::string					token;
+
+	while (iss >> token)
+		tokens.push_back(token);
+	return (tokens);
+}
+
+static inline std::string	getEventFromMessage(const std::string &msg)
+{
+	const std::size_t	lim = msg.find(':', 1);
+	return (lim == std::string::npos ? "" : msg.substr(1, lim - 1));
+}
+
+/*
+ID is <nick>!<username>@<IPaddr>
+*/
+static inline std::string	getNickFromID(const std::string &id)
+{
+	const std::size_t	lim = id.find('!');
+	return (lim == std::string::npos ? "" : id.substr(0, lim));
+}
+
+inline void	Unibot::resetPlayers(void)
+{
+	*_p = "";
+	*(_p + 1) = "";
+}
+
+inline void	Unibot::resetGame(void)
+{
+	++_game;
+	resetPlayers();
+}
+
+inline void	Unibot::resetInvite(void)
+{
+	_inviteStart = 0;
+	resetPlayers();
+}
+
+char	Unibot::handleEvents(const std::string &message)
+{
+	const std::string					event = getEventFromMessage(message);
+	if (event.empty())
+		return (0);
+
+	if (event.find(" KICK ") != std::string::npos)
 	{
-		logMessage("Failed to join #GAME channel after multiple attempts", true);
-		return false;
+		const std::vector<std::string>	split = ft_splitSpaces(event);
+		const std::string				target = split.back();
+		if (target == _nick) // Bot is kicked : stops
+		{
+			_running = false;
+			return (1);
+		}
+		if (target == *_p) // First player is kicked
+		{
+			if (_game) // Game phase : Second player wins
+			{
+				sendToChannel("[GAME] " + *_p + " was kicked. " + *(_p + 1) + " wins");
+				resetGame();
+			}
+			else // Invitation phase : Invitation ends
+			{
+				sendToChannel("[GAME INVITE] " + *_p + " was kicked. Invitation ends");
+				resetInvite();
+			}
+			return (1);
+		}
+		if (target == *(_p + 1) && _game) // Second player is kicked midgame : First player wins
+		{
+			sendToChannel("[GAME] " + *(_p + 1) + " was kicked. " + *_p + " wins");
+			resetGame();
+			return (1);
+		} // There is no invitation handling because someone can NICK and reply by 'y' or 'n'
 	}
-	return true;
+	else if (event.find(" NICK ") != std::string::npos)
+	{
+		const std::string				oldNick = getNickFromID(ft_splitSpaces(event)[0]);
+		const std::string				newNick = message.substr(event.size() + 2);
+		std::cout << newNick << std::endl;
+		if (oldNick == *_p)
+		{
+			*_p = newNick;
+			return (1);
+		}
+		if (oldNick == *(_p + 1))
+		{
+			*(_p + 1) = newNick;
+			return (1);
+		}
+	}
+	else if (event.find(" PART ") != std::string::npos || event.find(" QUIT ") != std::string::npos)
+	{
+		const std::string				client = getNickFromID(ft_splitSpaces(event)[0]);
+		if (client == *_p) // First player leaves
+		{
+			if (_game) // Game phase : Second player wins
+			{
+				sendToChannel("[GAME] " + *_p + " left. " + *(_p + 1) + " wins");
+				resetGame();
+			}
+			else // Invitation phase : Invitation ends
+			{
+				sendToChannel("[GAME INVITE] " + *_p + " left. Invitation ends");
+				resetInvite();
+			}
+			return (1);
+		}
+		if (client == *(_p + 1) && _game) // Second player leaves midgame : First player wins
+		{
+			sendToChannel("[GAME] " + *(_p + 1) + " left. " + *_p + " wins");
+			resetGame();
+			return (1);
+		} // There is no invitation handling because someone can NICK and reply by 'y' or 'n'
+	}
+	return (0);
 }
 
-void Unibot::handleCommands(const std::string &message) {
-	std::cout << "Handling command: " << message << std::endl;
-	if (message.find("!CACA") != std::string::npos) {
-		std::cout << "Received !CACA command" << std::endl;
-		sendMessage("PRIVMSG #GAME :PROUUUUUUT");
-	} else if (message.find("!PING") != std::string::npos) {
-		sendMessage("PRIVMSG #GAME :PONG");
-	} else if (message.find("!EXIT") != std::string::npos) {
-		_running = false;
+void	Unibot::reportX3T(void)
+{
+	sendToChannel("[GAME] " + *(_p + _turn) + "'s turn");
+	if (_gm == 1)
+	{
+		const std::vector<std::string>	table = _x3t->getFormattedTable();
+		sendToChannel(table[0]);
+		sendToChannel(table[1]);
+		sendToChannel(table[2]);
+		return ;
+	}
+	for (char i = 0; i < 3; ++i)
+	{
+		const char						step = i * 3;
+		const std::vector<std::string>	table[3] = {(_x3t + step)->getFormattedTable(), (_x3t + step + 1)->getFormattedTable(), (_x3t + step + 2)->getFormattedTable()};
+		sendToChannel(table[0][0] + "  " + table[1][0] + "  " + table[2][0]);
+		sendToChannel(table[0][1] + "  " + table[1][1] + "  " + table[2][1]);
+		sendToChannel(table[0][2] + "  " + table[1][2] + "  " + table[2][2]);
+		if (i < 2)
+			sendToChannel("");
 	}
 }
 
-void Unibot::run()
+static inline char	answerToInt(const char &answer)
+{
+	return (answer >= '1' && answer <= '9' ? answer - '1' : -1);
+}
+
+void	Unibot::playGameBasic(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (client != *(_p + _turn))
+		return ;
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>play: 1 parameter: <index>"));
+	const std::string	answer = tokens[1];
+	const char			index = answerToInt(answer[0]);
+	if (answer.size() > 1 || index < 0)
+		return (sendToChannel("<prefix>play: invalid index"));
+	if (!_x3t->isPlayable(index))
+		return (sendToChannel("[GAME] Can't play this, case already filled"));
+	_x3t->play(*(_sign + _turn), index);
+	if (_x3t->isWin())
+	{
+		reportX3T();
+		sendToChannel("[GAME OVER] " + *(_p + _turn) + " wins");
+		return (resetGame());
+	}
+	else if (_x3t->isFull())
+	{
+		reportX3T();
+		sendToChannel("[GAME OVER] No one wins");
+		return (resetGame());
+	}
+	++_turn;
+	reportX3T();
+}
+
+void	Unibot::playGameBidimensional(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (client != *(_p + _turn))
+		return ;
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>play: 1 parameter: <pos> = two indexes (example : 16 is the sixth slot of the first field)"));
+	const std::string	answer = tokens[1];
+	if (answer.size() != 2)
+		return (sendToChannel("<prefix>play: invalid pos"));
+	const char			i0 = answerToInt(answer[0]);
+	const char			i1 = answerToInt(answer[1]);
+	if (i0 < 0 || i1 < 0)
+		return (sendToChannel("<prefix>play: invalid pos"));
+	if (_forcedMove < 9 && i0 != _forcedMove)
+		return (sendToChannel("[GAME] Can't play this, you are forced to play in " + std::string(1, (_forcedMove + 1 + '0'))));
+	Unibot::X3T *const	field = _x3t + i0;
+	const char			sign = *(_sign + _turn);
+	if (!field->isPlayable(i1))
+		return (sendToChannel("[GAME] Can't play this, case already filled"));
+	field->play(sign, i1);
+	if (field->isWin())
+	{
+		if (_gm == 2) // Simple bidimensional Win Condition
+		{
+			reportX3T();
+			sendToChannel("[GAME OVER] " + *(_p + _turn) + " wins");
+			return (resetGame());
+		}
+		field->fillTable(sign);
+		(_x3t + 9)->play(sign, i0);
+	}
+	else if (field->isFull())
+		(_x3t + 9)->play(i0, i0);
+	++_turn;
+	reportX3T();
+	if ((_x3t + 9)->isWin()) // Extreme Bidimensional Win Condition
+	{
+		sendToChannel("[GAME OVER] " + *(_p + --_turn) + " wins");
+		return (resetGame());
+	}
+	else if ((_x3t + 9)->isFull()) // Both Modes Draw Condition
+	{
+		sendToChannel("[GAME OVER] No one wins");
+		return (resetGame());
+	}
+	// Force Next Move
+	if ((_x3t + 9)->isPlayable(i1))
+		_forcedMove = i1;
+	else
+		_forcedMove = -1;
+}
+
+void	Unibot::inviteGame(const std::string &client, const std::vector<std::string> &tokens)
+{
+	const std::size_t	tsize = tokens.size();
+	if (tsize < 2 || tsize > 3)
+		return (sendToChannel("<prefix>play: 1-2 parameter: [<gamemode{1|2|e}>] <nick>"));
+	if (tsize == 2 || tokens[1] == "1")
+		_gm = 1;
+	else if (tokens[1] == "2")
+		_gm = 2;
+	else if (tokens[1] == "e")
+		_gm = 3;
+	else
+		return (sendToChannel("<prefix>play: invalid gamemode: [<gamemode{1|2|e}>]"));
+	*_p = client;
+	*(_p + 1) = tokens.back();
+	if (_p->empty())
+		return (sendToChannel("[GAME INVITE] Unexpected error encountered"));
+	if (*_p == *(_p + 1))
+		return (sendToChannel("[GAME INVITE] You can't confront yourself"));
+	if (*(_p + 1) == _nick)
+		return (sendToChannel("[GAME INVITE CONFRONTING DEITY] I would eradicate your miserable life... Do not try me"));
+	std::string			gamemode;
+	if (_gm == 1)
+		gamemode = "basic";
+	else if (_gm == 2)
+		gamemode = "bidimensional";
+	else
+		gamemode = "bidimensional (extreme)";
+	sendToChannel(*_p + " challenges " + *(_p + 1) + " in a " + gamemode + " set ! (<prefix>play <answer{y|n}>)");
+	_inviteStart = now();
+}
+
+void	Unibot::replyGame(const std::string &client, const std::vector<std::string> &tokens)
+{
+	if (client != *(_p + 1))
+		return ;
+	if (tokens.size() != 2)
+		return (sendToChannel("<prefix>play: 1 parameter: <answer{y|n}>"));
+	if (tokens[1] == "n")
+	{
+		_inviteStart = 0;
+		return (sendToChannel("[GAME REPLY] " + client + " declined"));
+	}
+	if (tokens[1] == "y")
+	{
+		_inviteStart = 0;
+		++_game;
+		_turn = 0;
+		_x3t->fillTable('.');
+		_forcedMove = -1;
+		if (_gm > 1)
+			for (char i = 1; i < 10; ++i)
+				(_x3t + i)->fillTable('.');
+		sendToChannel("[GAME REPLY] " + client + " accepted");
+		return (reportX3T());
+	}
+	sendToChannel("<prefix>play <answer{y|n}>");
+}
+
+void	Unibot::handleCommands(const std::string &message)
+{
+	std::cout << "Handling message: " << message << std::endl;
+	const std::string			target = " PRIVMSG " + _currentChannel + " :" + _prefix;
+	const std::size_t			pos = message.find(target);
+	if (pos == std::string::npos)
+		return ;
+	const std::string			cmd = message.substr(pos + target.size());
+	if (std::isspace(cmd[0]))
+		return ;
+	std::cout << "Command found: " << cmd << std::endl;
+
+	std::vector<std::string>	tokens = ft_splitSpaces(cmd);
+	if (tokens.empty())
+		return ;
+	if (tokens[0] == "h" || tokens[0] == "help")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		sendToClient(client, "- HELP REQUEST -");
+		sendToClient(client, "");
+		sendToClient(client, "[GENERAL BEHAVIOUR] <name> : <> means it is variable, \"name\" is an indicator");
+		sendToClient(client, "[GENERAL BEHAVIOUR] [variable] : [] means it is optional, \"variable\" can be anything");
+		sendToClient(client, "[GENERAL BEHAVIOUR] {a|b|c} : {} means there are strict choices, \"|\" separates the different choices");
+		sendToClient(client, "[GENERAL BEHAVIOUR] During any state of game, <prefix>prefix and <prefix>channel are disabled");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>help : Sends this message to you");
+		sendToClient(client, "\t- [ALIAS] <prefix>h");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>prefix <new_prefix> : Changes the prefix");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>channel <channel> [<key>] : Changes the working channel");
+		sendToClient(client, "\t- [ALIAS] <prefix>c");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>play : See <prefix>rules to know everything about it");
+		sendToClient(client, "\t- [ALIAS] <prefix>p");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>rules : Sends rules to you");
+		sendToClient(client, "\t- [ALIAS] <prefix>r");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>quit : Quits any state of game (\"in invitation\" or \"in game\")");
+		sendToClient(client, "\t- [ALIAS] <prefix>q");
+		sendToClient(client, "");
+	}
+	else if (tokens[0] == "prefix")
+	{
+		if (_game || _inviteStart)
+			return (sendToChannel("<prefix>prefix: game state: can't perform"));
+		if (tokens.size() != 2)
+			return (sendToChannel("<current_prefix>prefix: 1 parameter: <new_prefix>"));
+		tokens[1] = cmd.substr(cmd.rfind(tokens[1]));
+		_prefix = tokens[1];
+		sendToChannel("prefix changed: [" + tokens[1] + "]");
+	}
+	else if (tokens[0] == "c" || tokens[0] == "channel")
+	{
+		if (_game || _inviteStart)
+			return (sendToChannel("<prefix>channel: game state: can't perform"));
+		std::size_t	tsize = tokens.size();
+		if (tsize < 2 || tsize > 3)
+			return (sendToChannel("<prefix>channel: 1-2 parameters: <channel> [<key>]"));
+		if (tokens[1] == _currentChannel)
+			return (sendToChannel("<prefix>channel: can't change to <current_channel>"));
+		_key = (tsize == 3 ? tokens[2] : "");
+		std::string	oldChannel = _currentChannel;
+		if (joinChannel(tokens[1]))
+			sendMessage("PART " + oldChannel + " :channel changed: [" + _currentChannel + (tsize == 3 ? ("](" + tokens[2] + ")") : "]"));
+		else
+			sendToChannel("<prefix>channel: can't join " + tokens[1]);
+	}
+	else if (tokens[0] == "r" || tokens[0] == "rules")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		sendToClient(client, "- RULES REQUEST -");
+		sendToClient(client, "");
+		sendToClient(client, "[ALIAS] \"x3t\" stands for \"Tic Tac Toe\"");
+		sendToClient(client, "");
+		sendToClient(client, "[CMD] <prefix>play <nick> : Invite <nick> to a [BASIC SET] of x3t");
+		sendToClient(client, "[CMD] <prefix>play 1 <nick>: Invite <nick> to a [BASIC SET] of x3t");
+		sendToClient(client, "[CMD] <prefix>play 2 <nick> : Invite <nick> to a [BIDIMENSIONAL SET] of x3t");
+		sendToClient(client, "[CMD] <prefix>play e <nick> : Invite <nick> to a [BIDIMENSIONAL EXTREME SET] of x3t");
+		sendToClient(client, "[CMD] <prefix>play <answer{y|n}> : Accept or refuse an invitation");
+		sendToClient(client, "");
+		sendToClient(client, "[GENERAL BEHAVIOUR] Only one game can occur at a time");
+		sendToClient(client, "[GENERAL BEHAVIOUR] The first player is the one who invites and their sign is X.");
+		sendToClient(client, "[GENERAL BEHAVIOUR] On PART/KICK/QUIT, the one who stays wins");
+		sendToClient(client, "[GENERAL BEHAVIOUR] On <prefix>quit, the opponent wins");
+		sendToClient(client, "");
+		sendToClient(client, "[BASIC SET] Basic x3t:");
+		sendToClient(client, "\t- [CMD] <prefix>play <index>");
+		sendToClient(client, "\t\t- <index> is [1;9] ∈ℕ");
+		sendToClient(client, "");
+		sendToClient(client, "[BIDIMENSIONAL SET] Bidimensional x3t");
+		sendToClient(client, "\t- [CMD] <prefix>play <pos>");
+		sendToClient(client, "\t\t- <pos> is two indexes : <index><index> (ex. 11, 95, 56)");
+		sendToClient(client, "\t\t- The first index of <pos> represents the x3t we play in, the second one indicates the case to play in within that x3t");
+		sendToClient(client, "\t- [BEHAVIOUR] Each player is forced to play in a specific x3t depending on the previous move (ex. previous position is 15 -> forced to play in the 5th x3t)");
+		sendToClient(client, "\t\t- On game start or if the targeted x3t is full, no forced move is active");
+		sendToClient(client, "\t- [WIN CONDITION] Win in a single x3t");
+		sendToClient(client, "\t- [DRAW CONDITION] Draw in all x3t");
+		sendToClient(client, "");
+		sendToClient(client, "[BIDIMENSIONAL EXTREME SET] Bidimensional Extreme x3t");
+		sendToClient(client, "\t- [BIDIMENSIONAL SET]'s [CMD]");
+		sendToClient(client, "\t- [BIDIMENSIONAL SET]'s [BEHAVIOUR]");
+		sendToClient(client, "\t- [BEHAVIOUR] On winning one x3t, that x3t is filled with the winner's sign");
+		sendToClient(client, "\t- [WIN CONDITION] Win in three aligned x3t");
+		sendToClient(client, "\t- [BIDIMENSIONAL SET]'s [DRAW CONDITION]");
+		sendToClient(client, "");
+	}
+	else if (tokens[0] == "r34" || tokens[0] == "rule34") // Easter Egg
+		return (sendToChannel("(.)(.)"));
+	else if (tokens[0] == "p" || tokens[0] == "play")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		if (_game)
+		{	if (_gm == 1)
+				playGameBasic(client, tokens);
+			else
+				playGameBidimensional(client, tokens);
+		}
+		else if (!_game && !_inviteStart)
+			inviteGame(client, tokens);
+		else
+			replyGame(client, tokens);
+		if (!_game && !_inviteStart)
+			resetPlayers();
+	}
+	else if (tokens[0] == "q" || tokens[0] == "quit")
+	{
+		const std::string	client = getNickFromID(ft_splitSpaces(getEventFromMessage(message))[0]);
+		if (tokens.size() != 1)
+			return (sendToChannel("<prefix>quit: no parameter"));
+		if (_game)
+		{
+			if (client == *_p) // First player forfeits
+			{
+				sendToChannel("[GAME] " + *_p + " forfeits. " + *(_p + 1) + " wins");
+				resetGame();
+			}
+			else if (client == *(_p + 1)) // Second player forfeits
+			{
+				sendToChannel("[GAME] " + *(_p + 1) + " forfeits. " + *_p + " wins");
+				resetGame();
+			}
+			return ;
+		}
+		if (_inviteStart)
+		{
+			if (client == *_p)
+			{
+				sendToChannel("[GAME INVITE] " + *_p + " cancelled their request");
+				resetInvite();
+			}
+			else
+				sendToChannel("[GUY WHO DOES NOT OWN THE RIGHT TO CANCEL THIS REQUEST] Who are you?");
+			return ;
+		}
+		return (sendToChannel("<prefix>quit: not in game state: can't perform"));
+	}
+}
+
+void	Unibot::run()
 {
 	if (!connectServer())
 	{
@@ -311,25 +853,36 @@ void Unibot::run()
 		disconnect();
 		return;
 	}
-	if (!joinGameChannel())
+	fcntl(_fd, F_SETFL, O_NONBLOCK);
+	if (!joinChannel(_currentChannel))
 	{
-		logMessage("Failed to join #GAME channel", true);
 		disconnect();
 		return;
 	}
 	clearIncomingMessages();
+	sendToChannel("Hi ! You can play with me thanks to the prefix [" + _prefix + "] (<prefix>help for more information)");
+	flushOutgoingMessages();
+	resetInvite();
+	_game = 0;
 	while (_running)
 	{
 		struct pollfd fds[1];
 		fds[0].fd = _fd;
 		fds[0].events = POLLIN;
-		int ret = poll(fds, 1, 5000); // 5 seconds timeout
+		int ret = poll(fds, 1, _timeout); // 5 seconds timeout
 		if (ret < 0)
 		{
 			logMessage("Poll error: " + std::string(strerror(errno)), true);
 			break;
 		}
-		else if (ret == 0)
+		static const long	inviteTimeout = _timeout * 5;
+		if (_inviteStart && ((now() - _inviteStart) > inviteTimeout))
+		{
+			_inviteStart = 0;
+			sendToChannel("Match request timeout");
+			flushOutgoingMessages();
+		}
+		if (ret == 0)
 		{
 			// Timeout, no data received
 			continue;
@@ -341,7 +894,10 @@ void Unibot::run()
 			while (!_incomingMessages.empty())
 			{
 				std::string msg = getLastMessage();
-				handleCommands(msg);
+				if (!handleEvents(msg))
+					handleCommands(msg);
+				if (!_running)
+					return (disconnect());
 			}
 		}
 		flushOutgoingMessages();
@@ -356,9 +912,9 @@ void	SignalHandler(int signum)
 
 int	main(int argc, char *argv[])
 {
-	if (argc != 3)
+	if (argc < 4 || argc > 5)
 	{
-		std::cerr << "Usage: ./Unibot <port> <password>" << std::endl;
+		std::cerr << "Usage: ./Unibot <port> <password> <channel> [<key>]" << std::endl;
 		return (1);
 	}
 	int port = atoi(argv[1]);
@@ -374,7 +930,7 @@ int	main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE crash send
 
 	// Initialize and run the bot
-	Unibot bot(argv[2], port);
+	Unibot bot(argv[2], port, *(argv + 3), (argc == 5 ? *(argv + 4) : ""));
 	bot.run();
 
 	return (0);

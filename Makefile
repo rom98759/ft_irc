@@ -1,6 +1,6 @@
 NAME = ircserv
 
-NAME_BONUS = unibot^_^
+NAME_BONUS = Unibot^_^
 
 OBJDIR = obj/
 
@@ -58,4 +58,4 @@ re: fclean all
 
 .PHONY: all clean fclean re bonus
 
--include $(DEP)
+-include $(DEP) $(DEP_BONUS)
