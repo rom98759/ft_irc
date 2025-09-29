@@ -854,7 +854,7 @@ char	Server::kick(Client *const cl, const std::vector<std::string> &tokens)
 
 	std::string channelName = tokens[1];
 	std::string kickNick = tokens[2];
-	std::string reason = (tokens.size() > 3) ? tokens[3] : cl->getNick();
+	std::string reason = (tokens.size() > 3) ? tokens[3] : "No reason";
 
 	Channel *chan = getChannel(channelName);
 	if (!chan)
